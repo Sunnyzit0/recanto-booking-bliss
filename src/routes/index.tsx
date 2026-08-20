@@ -11,11 +11,11 @@ import {
   type Reserva,
 } from "@/lib/reservas";
 
-import logo from "@/assets/image-2.png.asset.json";
-import fotoPiscina from "@/assets/image.png.asset.json";
-import fotoArea from "@/assets/image-3.png.asset.json";
-import fotoGourmet from "@/assets/image-4.png.asset.json";
-import fotoNoite from "@/assets/image-5.png.asset.json";
+import logo from "@/assets/logo.png";
+import fotoPiscina from "@/assets/piscina-dia.jpg";
+import fotoArea from "@/assets/piscina-area-externa.jpg";
+import fotoGourmet from "@/assets/area-gourmet-churrasqueira.jpg";
+import fotoNoite from "@/assets/piscina-noite.jpg";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -46,10 +46,10 @@ const DIFERENCIAIS = [
 ];
 
 const FOTOS = [
-  { src: fotoPiscina.url, alt: "Piscina com cascata do Recanto da Piscina" },
-  { src: fotoArea.url, alt: "Área externa com pergolado e piscina" },
-  { src: fotoGourmet.url, alt: "Área gourmet com churrasqueira de alvenaria e cooktop" },
-  { src: fotoNoite.url, alt: "Piscina iluminada à noite" },
+  { src: fotoPiscina, alt: "Piscina com cascata do Recanto da Piscina" },
+  { src: fotoArea, alt: "Área externa com pergolado e piscina" },
+  { src: fotoGourmet, alt: "Área gourmet com churrasqueira de alvenaria e cooktop" },
+  { src: fotoNoite, alt: "Piscina iluminada à noite" },
 ];
 
 function Home() {
@@ -93,7 +93,7 @@ function Home() {
       {/* Topo */}
       <header className="sticky top-0 z-10 border-b border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <img src={logo.url} alt="Logo Recanto da Piscina" className="h-12 w-auto" />
+          <img src={logo} alt="Logo Recanto da Piscina" className="h-12 w-auto" />
           <nav className="flex items-center gap-4 text-sm">
             <a href="#reservar" className="text-muted-foreground transition hover:text-foreground">
               Reservar
@@ -108,7 +108,7 @@ function Home() {
       {/* Hero */}
       <section className="relative">
         <img
-          src={fotoPiscina.url}
+          src={fotoPiscina}
           alt="Piscina do Recanto da Piscina em dia de sol"
           className="h-[60vh] min-h-80 w-full object-cover"
         />
