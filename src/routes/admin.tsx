@@ -3,12 +3,13 @@ import { useEffect, useState } from "react";
 import { Calendario } from "@/components/Calendario";
 import {
   CONFIG,
+  alternarBloqueio as alternarBloqueioDB,
+  atualizarReserva,
   datasIndisponiveis,
+  escutarAtualizacoes,
   formatarData,
   lerBloqueios,
   lerReservas,
-  salvarBloqueios,
-  salvarReservas,
   type Reserva,
   type Status,
 } from "@/lib/reservas";
@@ -39,24 +40,32 @@ function Admin() {
 
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [bloqueios, setBloqueios] = useState<string[]>([]);
+  const [carregando, setCarregando] = useState(true);
 
-  useEffect(() => {
-    setReservas(lerReservas());
-    setBloqueios(lerBloqueios());
-  }, []);
-
-  function atualizar(id: string, mudanca: Partial<Reserva>) {
-    const novas = reservas.map((r) => (r.id === id ? { ...r, ...mudanca } : r));
-    setReservas(novas);
-    salvarReservas(novas);
+  async function carregar() {
+    const [novasReservas, novosBloqueios] = await Promise.all([lerReservas(), lerBloqueios()]);
+    setReservas(novasReservas);
+    setBloqueios(novosBloqueios);
+    setCarregando(false);
   }
 
-  function alternarBloqueio(data: string) {
-    const novos = bloqueios.includes(data)
-      ? bloqueios.filter((d) => d !== data)
-      : [...bloqueios, data];
-    setBloqueios(novos);
-    salvarBloqueios(novos);
+  useEffect(() => {
+    carregar();
+    const parar = escutarAtualizacoes(() => carregar());
+    return parar;
+  }, []);
+
+  async function atualizar(id: string, mudanca: Partial<Reserva>) {
+    setReservas((atual) => atual.map((r) => (r.id === id ? { ...r, ...mudanca } : r)));
+    await atualizarReserva(id, mudanca);
+  }
+
+  async function alternarBloqueio(data: string) {
+    const jaBloqueada = bloqueios.includes(data);
+    setBloqueios((atual) =>
+      jaBloqueada ? atual.filter((d) => d !== data) : [...atual, data],
+    );
+    await alternarBloqueioDB(data, jaBloqueada);
   }
 
   if (!logado) {
@@ -112,7 +121,8 @@ function Admin() {
       <section className="mt-8">
         <h2 className="font-display text-2xl text-foreground">Solicitações</h2>
         <div className="mt-4 space-y-4">
-          {reservas.length === 0 && (
+          {carregando && <p className="text-sm text-muted-foreground">Carregando reservas...</p>}
+          {!carregando && reservas.length === 0 && (
             <p className="text-sm text-muted-foreground">Nenhuma solicitação recebida ainda.</p>
           )}
           {reservas.map((r) => (

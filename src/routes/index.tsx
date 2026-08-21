@@ -3,11 +3,12 @@ import { useEffect, useState } from "react";
 import { Calendario } from "@/components/Calendario";
 import {
   CONFIG,
+  criarReserva,
   datasIndisponiveis,
+  escutarAtualizacoes,
   formatarData,
   lerBloqueios,
   lerReservas,
-  salvarReservas,
   type Reserva,
 } from "@/lib/reservas";
 
@@ -59,33 +60,46 @@ function Home() {
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [enviada, setEnviada] = useState(false);
+  const [enviando, setEnviando] = useState(false);
+  const [erroEnvio, setErroEnvio] = useState(false);
+
+  async function carregar() {
+    const [novasReservas, novosBloqueios] = await Promise.all([lerReservas(), lerBloqueios()]);
+    setReservas(novasReservas);
+    setBloqueios(novosBloqueios);
+  }
 
   useEffect(() => {
-    setReservas(lerReservas());
-    setBloqueios(lerBloqueios());
+    carregar();
+    const parar = escutarAtualizacoes(() => carregar());
+    return parar;
   }, []);
 
   const indisponiveis = datasIndisponiveis(reservas, bloqueios);
 
-  function enviar(e: React.FormEvent) {
+  async function enviar(e: React.FormEvent) {
     e.preventDefault();
     if (!nome || !telefone || !data) return;
-    const nova: Reserva = {
-      id: String(Date.now()),
-      nome,
-      telefone,
-      data,
-      valor: CONFIG.valorDiaria,
-      horario: CONFIG.horario,
-      status: "pendente",
-    };
-    const atualizadas = [...reservas, nova];
-    setReservas(atualizadas);
-    salvarReservas(atualizadas);
-    setEnviada(true);
-    setNome("");
-    setTelefone("");
-    setData("");
+    setEnviando(true);
+    setErroEnvio(false);
+    try {
+      await criarReserva({
+        nome,
+        telefone,
+        data,
+        valor: CONFIG.valorDiaria,
+        horario: CONFIG.horario,
+      });
+      setEnviada(true);
+      setNome("");
+      setTelefone("");
+      setData("");
+    } catch (erro) {
+      console.error(erro);
+      setErroEnvio(true);
+    } finally {
+      setEnviando(false);
+    }
   }
 
   return (
@@ -218,15 +232,22 @@ function Home() {
 
               <button
                 type="submit"
-                className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+                disabled={enviando}
+                className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
               >
-                Enviar solicitação
+                {enviando ? "Enviando..." : "Enviar solicitação"}
               </button>
 
               {enviada && (
                 <p className="rounded-lg bg-accent px-4 py-3 text-sm text-accent-foreground">
                   Solicitação enviada! Entraremos em contato pelo telefone {CONFIG.telefone} para
                   confirmar.
+                </p>
+              )}
+
+              {erroEnvio && (
+                <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                  Não foi possível enviar sua solicitação. Tente novamente ou chame no WhatsApp.
                 </p>
               )}
 

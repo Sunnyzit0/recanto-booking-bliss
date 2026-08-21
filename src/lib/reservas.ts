@@ -1,3 +1,5 @@
+import { supabase } from "@/lib/supabase";
+
 // ---------------------------------------------------------------------------
 // CONFIGURAÇÕES DO ESPAÇO — edite aqui livremente
 // ---------------------------------------------------------------------------
@@ -28,36 +30,6 @@ export type Reserva = {
   status: Status;
 };
 
-// Dados de exemplo (mock). Substitua por um banco de dados quando quiser.
-const RESERVAS_INICIAIS: Reserva[] = [
-  {
-    id: "1",
-    nome: "Marina Alves",
-    telefone: "(61) 99123-4567",
-    data: proximaData(6),
-    valor: CONFIG.valorDiaria,
-    horario: CONFIG.horario,
-    status: "aprovada",
-  },
-  {
-    id: "2",
-    nome: "Carlos Ribeiro",
-    telefone: "(61) 98877-1122",
-    data: proximaData(12),
-    valor: CONFIG.valorDiaria,
-    horario: CONFIG.horario,
-    status: "pendente",
-  },
-];
-
-const DATAS_BLOQUEADAS_INICIAIS: string[] = [proximaData(9)];
-
-function proximaData(dias: number) {
-  const d = new Date();
-  d.setDate(d.getDate() + dias);
-  return toISO(d);
-}
-
 export function toISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
     d.getDate(),
@@ -69,40 +41,70 @@ export function formatarData(iso: string) {
   return `${d}/${m}/${a}`;
 }
 
-// --- Armazenamento simples no navegador (troque por banco de dados depois) ---
-const KEY_RESERVAS = "recanto:reservas";
-const KEY_BLOQUEIOS = "recanto:bloqueios";
+// --- Reservas (tabela "reservas" no Supabase) ---
 
-function ler<T>(chave: string, padrao: T): T {
-  if (typeof window === "undefined") return padrao;
-  try {
-    const bruto = window.localStorage.getItem(chave);
-    return bruto ? (JSON.parse(bruto) as T) : padrao;
-  } catch {
-    return padrao;
+export async function lerReservas(): Promise<Reserva[]> {
+  const { data, error } = await supabase
+    .from("reservas")
+    .select("*")
+    .order("data", { ascending: true });
+
+  if (error) {
+    console.error("Erro ao ler reservas:", error.message);
+    return [];
   }
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    nome: r.nome,
+    telefone: r.telefone,
+    data: r.data,
+    valor: Number(r.valor),
+    horario: r.horario,
+    status: r.status,
+  }));
 }
 
-function salvar(chave: string, valor: unknown) {
-  if (typeof window === "undefined") return;
-  window.localStorage.setItem(chave, JSON.stringify(valor));
-  window.dispatchEvent(new Event("recanto:atualizado"));
+/** Cria uma nova solicitação de reserva (usado pelo formulário do cliente) */
+export async function criarReserva(reserva: Omit<Reserva, "id" | "status">) {
+  const { error } = await supabase.from("reservas").insert({
+    nome: reserva.nome,
+    telefone: reserva.telefone,
+    data: reserva.data,
+    valor: reserva.valor,
+    horario: reserva.horario,
+    status: "pendente",
+  });
+
+  if (error) throw new Error(error.message);
 }
 
-export function lerReservas() {
-  return ler<Reserva[]>(KEY_RESERVAS, RESERVAS_INICIAIS);
+/** Atualiza uma reserva existente (usado pelo painel admin: aprovar/recusar/editar) */
+export async function atualizarReserva(id: string, mudanca: Partial<Reserva>) {
+  const { error } = await supabase.from("reservas").update(mudanca).eq("id", id);
+  if (error) throw new Error(error.message);
 }
 
-export function salvarReservas(reservas: Reserva[]) {
-  salvar(KEY_RESERVAS, reservas);
+// --- Bloqueios manuais (tabela "bloqueios" no Supabase) ---
+
+export async function lerBloqueios(): Promise<string[]> {
+  const { data, error } = await supabase.from("bloqueios").select("data");
+  if (error) {
+    console.error("Erro ao ler bloqueios:", error.message);
+    return [];
+  }
+  return (data ?? []).map((b) => b.data);
 }
 
-export function lerBloqueios() {
-  return ler<string[]>(KEY_BLOQUEIOS, DATAS_BLOQUEADAS_INICIAIS);
-}
-
-export function salvarBloqueios(datas: string[]) {
-  salvar(KEY_BLOQUEIOS, datas);
+/** Alterna uma data: se já estava bloqueada, libera; senão, bloqueia */
+export async function alternarBloqueio(data: string, bloqueadaAtualmente: boolean) {
+  if (bloqueadaAtualmente) {
+    const { error } = await supabase.from("bloqueios").delete().eq("data", data);
+    if (error) throw new Error(error.message);
+  } else {
+    const { error } = await supabase.from("bloqueios").insert({ data });
+    if (error) throw new Error(error.message);
+  }
 }
 
 /** Datas indisponíveis = bloqueadas pelo dono + reservas aprovadas */
@@ -111,4 +113,17 @@ export function datasIndisponiveis(reservas: Reserva[], bloqueios: string[]) {
     ...bloqueios,
     ...reservas.filter((r) => r.status === "aprovada").map((r) => r.data),
   ]);
+}
+
+/** Escuta mudanças em tempo real nas tabelas de reservas e bloqueios */
+export function escutarAtualizacoes(callback: () => void) {
+  const canal = supabase
+    .channel("recanto-mudancas")
+    .on("postgres_changes", { event: "*", schema: "public", table: "reservas" }, callback)
+    .on("postgres_changes", { event: "*", schema: "public", table: "bloqueios" }, callback)
+    .subscribe();
+
+  return () => {
+    supabase.removeChannel(canal);
+  };
 }
