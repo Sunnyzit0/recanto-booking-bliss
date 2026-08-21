@@ -107,7 +107,11 @@ function Home() {
       {/* Topo */}
       <header className="sticky top-0 z-10 border-b border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <img src={logo} alt="Logo Recanto da Piscina" className="h-12 w-auto" />
+          <img
+            src={logo}
+            alt="Logo Recanto da Piscina"
+            className="h-12 w-12 rounded-full object-cover"
+          />
           <nav className="flex items-center gap-4 text-sm">
             <a href="#reservar" className="text-muted-foreground transition hover:text-foreground">
               Reservar
@@ -282,9 +286,6 @@ function Home() {
         >
           Falar no WhatsApp
         </a>
-        <p className="mt-10 text-xs text-muted-foreground">
-          © {new Date().getFullYear()} {CONFIG.nome} — {CONFIG.subtitulo}
-        </p>
       </footer>
     </main>
   );

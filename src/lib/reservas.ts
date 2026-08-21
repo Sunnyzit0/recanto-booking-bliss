@@ -15,7 +15,7 @@ export const CONFIG = {
   pagamento: "Pix ou dinheiro",
   cancelamento: "Cancelamento gratuito até 24h antes da data reservada.",
   // Senha da área do administrador — troque por uma senha sua
-  senhaAdmin: "recanto2026",
+  senhaAdmin: "ney2026",
 };
 
 export type Status = "pendente" | "aprovada" | "recusada";

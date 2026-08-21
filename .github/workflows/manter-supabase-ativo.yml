@@ -1,0 +1,18 @@
+name: Manter Supabase ativo
+
+on:
+  schedule:
+    # Roda toda segunda e quinta-feira, às 09:00 (horário de Brasília, UTC-3 => 12:00 UTC)
+    - cron: "0 12 * * 1,4"
+  workflow_dispatch: {} # permite rodar manualmente também, se quiser testar
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fazer uma consulta simples ao banco (mantém o projeto ativo)
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            "https://vulfmcjebavvjuixorgv.supabase.co/rest/v1/bloqueios?select=data&limit=1" \
+            -H "apikey: sb_publishable_0gqCLHIRs8UBtTtC2Ka0Zw_RkTq6qMK" \
+            -H "Authorization: Bearer sb_publishable_0gqCLHIRs8UBtTtC2Ka0Zw_RkTq6qMK"

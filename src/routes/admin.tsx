@@ -42,6 +42,18 @@ function Admin() {
   const [bloqueios, setBloqueios] = useState<string[]>([]);
   const [carregando, setCarregando] = useState(true);
 
+  // Mantém o admin logado nesse aparelho/navegador entre visitas
+  useEffect(() => {
+    if (typeof window !== "undefined" && localStorage.getItem("recanto_admin_logado") === "true") {
+      setLogado(true);
+    }
+  }, []);
+
+  function sair() {
+    localStorage.removeItem("recanto_admin_logado");
+    setLogado(false);
+  }
+
   async function carregar() {
     const [novasReservas, novosBloqueios] = await Promise.all([lerReservas(), lerBloqueios()]);
     setReservas(novasReservas);
@@ -74,8 +86,10 @@ function Admin() {
         <form
           onSubmit={(e) => {
             e.preventDefault();
-            if (senha === CONFIG.senhaAdmin) setLogado(true);
-            else setErro(true);
+            if (senha === CONFIG.senhaAdmin) {
+              localStorage.setItem("recanto_admin_logado", "true");
+              setLogado(true);
+            } else setErro(true);
           }}
           className="shadow-soft w-full max-w-sm rounded-2xl border border-border bg-card p-6"
         >
@@ -112,7 +126,7 @@ function Admin() {
         <h1 className="font-display text-3xl text-foreground">Painel de reservas</h1>
         <div className="flex gap-4 text-sm">
           <Link to="/" className="text-muted-foreground hover:underline">Ver site</Link>
-          <button onClick={() => setLogado(false)} className="text-muted-foreground hover:underline">
+          <button onClick={sair} className="text-muted-foreground hover:underline">
             Sair
           </button>
         </div>
@@ -130,7 +144,7 @@ function Admin() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <p className="font-medium text-foreground">{r.nome}</p>
-                  <p className="text-sm text-muted-foreground">{r.telefone}</p>
+                  <p className="text-sm text-muted-foreground">📞 {r.telefone}</p>
                 </div>
                 <span className={`rounded-full px-3 py-1 text-xs capitalize ${CORES[r.status]}`}>
                   {r.status}
