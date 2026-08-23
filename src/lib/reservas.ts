@@ -14,8 +14,8 @@ export const CONFIG = {
   horario: "das 8h às 22h",
   pagamento: "Pix ou dinheiro",
   cancelamento: "Cancelamento gratuito até 24h antes da data reservada.",
-  // Senha da área do administrador — troque por uma senha sua
-  senhaAdmin: "ney2026",
+  // O login do admin agora é feito por senha única, verificada no
+  // servidor (variável de ambiente ADMIN_PASSWORD) — veja src/server/admin.ts.
 };
 
 export type Status = "pendente" | "aprovada" | "recusada";
@@ -41,31 +41,9 @@ export function formatarData(iso: string) {
   return `${d}/${m}/${a}`;
 }
 
-// --- Reservas (tabela "reservas" no Supabase) ---
+// --- Funções usadas pela página PÚBLICA (sem login, chave anônima) ---
 
-export async function lerReservas(): Promise<Reserva[]> {
-  const { data, error } = await supabase
-    .from("reservas")
-    .select("*")
-    .order("data", { ascending: true });
-
-  if (error) {
-    console.error("Erro ao ler reservas:", error.message);
-    return [];
-  }
-
-  return (data ?? []).map((r) => ({
-    id: r.id,
-    nome: r.nome,
-    telefone: r.telefone,
-    data: r.data,
-    valor: Number(r.valor),
-    horario: r.horario,
-    status: r.status,
-  }));
-}
-
-/** Cria uma nova solicitação de reserva (usado pelo formulário do cliente) */
+/** Cria uma nova solicitação de reserva (formulário do cliente) */
 export async function criarReserva(reserva: Omit<Reserva, "id" | "status">) {
   const { error } = await supabase.from("reservas").insert({
     nome: reserva.nome,
@@ -75,18 +53,23 @@ export async function criarReserva(reserva: Omit<Reserva, "id" | "status">) {
     horario: reserva.horario,
     status: "pendente",
   });
-
   if (error) throw new Error(error.message);
 }
 
-/** Atualiza uma reserva existente (usado pelo painel admin: aprovar/recusar/editar) */
-export async function atualizarReserva(id: string, mudanca: Partial<Reserva>) {
-  const { error } = await supabase.from("reservas").update(mudanca).eq("id", id);
-  if (error) throw new Error(error.message);
+/**
+ * Retorna só as datas já ocupadas (reservas aprovadas), sem nome/telefone
+ * de ninguém — usado pelo calendário da página pública.
+ */
+export async function lerDatasOcupadas(): Promise<string[]> {
+  const { data, error } = await supabase.rpc("datas_ocupadas");
+  if (error) {
+    console.error("Erro ao ler datas ocupadas:", error.message);
+    return [];
+  }
+  return (data ?? []).map((r: { data: string }) => r.data);
 }
 
-// --- Bloqueios manuais (tabela "bloqueios" no Supabase) ---
-
+/** Datas bloqueadas manualmente pelo dono (não contém dados sensíveis) */
 export async function lerBloqueios(): Promise<string[]> {
   const { data, error } = await supabase.from("bloqueios").select("data");
   if (error) {
@@ -96,30 +79,10 @@ export async function lerBloqueios(): Promise<string[]> {
   return (data ?? []).map((b) => b.data);
 }
 
-/** Alterna uma data: se já estava bloqueada, libera; senão, bloqueia */
-export async function alternarBloqueio(data: string, bloqueadaAtualmente: boolean) {
-  if (bloqueadaAtualmente) {
-    const { error } = await supabase.from("bloqueios").delete().eq("data", data);
-    if (error) throw new Error(error.message);
-  } else {
-    const { error } = await supabase.from("bloqueios").insert({ data });
-    if (error) throw new Error(error.message);
-  }
-}
-
-/** Datas indisponíveis = bloqueadas pelo dono + reservas aprovadas */
-export function datasIndisponiveis(reservas: Reserva[], bloqueios: string[]) {
-  return new Set([
-    ...bloqueios,
-    ...reservas.filter((r) => r.status === "aprovada").map((r) => r.data),
-  ]);
-}
-
-/** Escuta mudanças em tempo real nas tabelas de reservas e bloqueios */
-export function escutarAtualizacoes(callback: () => void) {
+/** Escuta mudanças nos bloqueios em tempo real (página pública) */
+export function escutarBloqueios(callback: () => void) {
   const canal = supabase
-    .channel("recanto-mudancas")
-    .on("postgres_changes", { event: "*", schema: "public", table: "reservas" }, callback)
+    .channel("recanto-bloqueios-publico")
     .on("postgres_changes", { event: "*", schema: "public", table: "bloqueios" }, callback)
     .subscribe();
 

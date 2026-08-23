@@ -4,12 +4,10 @@ import { Calendario } from "@/components/Calendario";
 import {
   CONFIG,
   criarReserva,
-  datasIndisponiveis,
-  escutarAtualizacoes,
+  escutarBloqueios,
   formatarData,
   lerBloqueios,
-  lerReservas,
-  type Reserva,
+  lerDatasOcupadas,
 } from "@/lib/reservas";
 
 import logo from "@/assets/logo.png";
@@ -54,7 +52,7 @@ const FOTOS = [
 ];
 
 function Home() {
-  const [reservas, setReservas] = useState<Reserva[]>([]);
+  const [datasOcupadas, setDatasOcupadas] = useState<string[]>([]);
   const [bloqueios, setBloqueios] = useState<string[]>([]);
   const [data, setData] = useState("");
   const [nome, setNome] = useState("");
@@ -64,18 +62,24 @@ function Home() {
   const [erroEnvio, setErroEnvio] = useState(false);
 
   async function carregar() {
-    const [novasReservas, novosBloqueios] = await Promise.all([lerReservas(), lerBloqueios()]);
-    setReservas(novasReservas);
+    const [novasDatas, novosBloqueios] = await Promise.all([lerDatasOcupadas(), lerBloqueios()]);
+    setDatasOcupadas(novasDatas);
     setBloqueios(novosBloqueios);
   }
 
   useEffect(() => {
     carregar();
-    const parar = escutarAtualizacoes(() => carregar());
-    return parar;
+    // Bloqueios manuais atualizam na hora; reservas aprovadas por novos
+    // clientes aparecem em até 1 minuto (não exigem login pra consultar).
+    const parar = escutarBloqueios(() => carregar());
+    const intervalo = setInterval(carregar, 60_000);
+    return () => {
+      parar();
+      clearInterval(intervalo);
+    };
   }, []);
 
-  const indisponiveis = datasIndisponiveis(reservas, bloqueios);
+  const indisponiveis = new Set([...bloqueios, ...datasOcupadas]);
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -261,13 +265,9 @@ function Home() {
             </form>
           </div>
 
-          {reservas.some((r) => r.status === "aprovada") && (
+          {datasOcupadas.length > 0 && (
             <p className="mt-6 text-sm text-muted-foreground">
-              Próximas datas já confirmadas:{" "}
-              {reservas
-                .filter((r) => r.status === "aprovada")
-                .map((r) => formatarData(r.data))
-                .join(", ")}
+              Próximas datas já confirmadas: {datasOcupadas.map(formatarData).join(", ")}
             </p>
           )}
         </div>

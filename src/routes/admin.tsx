@@ -2,17 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Calendario } from "@/components/Calendario";
 import {
-  CONFIG,
-  alternarBloqueio as alternarBloqueioDB,
-  atualizarReserva,
-  datasIndisponiveis,
-  escutarAtualizacoes,
-  formatarData,
-  lerBloqueios,
-  lerReservas,
-  type Reserva,
-  type Status,
-} from "@/lib/reservas";
+  alternarBloqueioAdmin,
+  atualizarReservaAdmin,
+  listarBloqueiosAdmin,
+  listarReservasAdmin,
+  loginAdmin,
+  sairAdmin,
+  verificarSessaoAdmin,
+} from "@/lib/admin-actions";
+import { formatarData, type Reserva, type Status } from "@/lib/reservas";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -33,64 +31,93 @@ const CORES: Record<Status, string> = {
   recusada: "bg-destructive/10 text-destructive",
 };
 
+function datasIndisponiveisAdmin(reservas: Reserva[], bloqueios: string[]) {
+  return new Set([
+    ...bloqueios,
+    ...reservas.filter((r) => r.status === "aprovada").map((r) => r.data),
+  ]);
+}
+
 function Admin() {
   const [logado, setLogado] = useState(false);
+  const [verificandoSessao, setVerificandoSessao] = useState(true);
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState(false);
+  const [entrando, setEntrando] = useState(false);
 
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [bloqueios, setBloqueios] = useState<string[]>([]);
   const [carregando, setCarregando] = useState(true);
 
-  // Mantém o admin logado nesse aparelho/navegador entre visitas
+  // Verifica se já existe uma sessão válida (cookie assinado no servidor)
   useEffect(() => {
-    if (typeof window !== "undefined" && localStorage.getItem("recanto_admin_logado") === "true") {
-      setLogado(true);
-    }
+    verificarSessaoAdmin().then(({ logado }) => {
+      setLogado(logado);
+      setVerificandoSessao(false);
+    });
   }, []);
 
-  function sair() {
-    localStorage.removeItem("recanto_admin_logado");
+  async function entrar(e: React.FormEvent) {
+    e.preventDefault();
+    setEntrando(true);
+    setErro(false);
+    const resultado = await loginAdmin({ data: { senha } });
+    if (resultado.ok) {
+      setLogado(true);
+    } else {
+      setErro(true);
+    }
+    setEntrando(false);
+  }
+
+  async function sair() {
+    await sairAdmin();
     setLogado(false);
   }
 
   async function carregar() {
-    const [novasReservas, novosBloqueios] = await Promise.all([lerReservas(), lerBloqueios()]);
-    setReservas(novasReservas);
+    const [novasReservas, novosBloqueios] = await Promise.all([
+      listarReservasAdmin(),
+      listarBloqueiosAdmin(),
+    ]);
+    setReservas(novasReservas as Reserva[]);
     setBloqueios(novosBloqueios);
     setCarregando(false);
   }
 
   useEffect(() => {
+    if (!logado) return;
     carregar();
-    const parar = escutarAtualizacoes(() => carregar());
-    return parar;
-  }, []);
+    // Sem login "realtime" do banco aqui — atualiza a cada 20s, e também
+    // logo depois de qualquer ação (aprovar, recusar, editar, bloquear).
+    const intervalo = setInterval(carregar, 20_000);
+    return () => clearInterval(intervalo);
+  }, [logado]);
 
   async function atualizar(id: string, mudanca: Partial<Reserva>) {
     setReservas((atual) => atual.map((r) => (r.id === id ? { ...r, ...mudanca } : r)));
-    await atualizarReserva(id, mudanca);
+    await atualizarReservaAdmin({ data: { id, mudanca } });
   }
 
   async function alternarBloqueio(data: string) {
     const jaBloqueada = bloqueios.includes(data);
-    setBloqueios((atual) =>
-      jaBloqueada ? atual.filter((d) => d !== data) : [...atual, data],
+    setBloqueios((atual) => (jaBloqueada ? atual.filter((d) => d !== data) : [...atual, data]));
+    await alternarBloqueioAdmin({ data: { data, jaBloqueada } });
+  }
+
+  if (verificandoSessao) {
+    return (
+      <main className="flex min-h-screen items-center justify-center px-4">
+        <p className="text-sm text-muted-foreground">Verificando acesso...</p>
+      </main>
     );
-    await alternarBloqueioDB(data, jaBloqueada);
   }
 
   if (!logado) {
     return (
       <main className="flex min-h-screen items-center justify-center px-4">
         <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (senha === CONFIG.senhaAdmin) {
-              localStorage.setItem("recanto_admin_logado", "true");
-              setLogado(true);
-            } else setErro(true);
-          }}
+          onSubmit={entrar}
           className="shadow-soft w-full max-w-sm rounded-2xl border border-border bg-card p-6"
         >
           <h1 className="font-display text-2xl text-foreground">Área do administrador</h1>
@@ -103,14 +130,16 @@ function Admin() {
               setErro(false);
             }}
             placeholder="Senha"
+            autoComplete="current-password"
             className="mt-5 w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground outline-none focus:border-ring"
           />
           {erro && <p className="mt-2 text-sm text-destructive">Senha incorreta.</p>}
           <button
             type="submit"
-            className="mt-4 w-full rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+            disabled={entrando}
+            className="mt-4 w-full rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
           >
-            Entrar
+            {entrando ? "Entrando..." : "Entrar"}
           </button>
           <Link to="/" className="mt-4 block text-center text-sm text-muted-foreground hover:underline">
             Voltar ao site
@@ -207,7 +236,7 @@ function Admin() {
         <div className="mt-4 max-w-md">
           <Calendario
             modoAdmin
-            indisponiveis={datasIndisponiveis(reservas, bloqueios)}
+            indisponiveis={datasIndisponiveisAdmin(reservas, bloqueios)}
             onSelecionar={alternarBloqueio}
           />
         </div>
