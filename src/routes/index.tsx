@@ -6,8 +6,10 @@ import {
   criarReserva,
   escutarBloqueios,
   formatarData,
+  janelaDeReserva,
   lerBloqueios,
   lerDatasOcupadas,
+  lerDatasPendentes,
 } from "@/lib/reservas";
 
 import logo from "@/assets/logo.png";
@@ -53,7 +55,9 @@ const FOTOS = [
 
 function Home() {
   const [datasOcupadas, setDatasOcupadas] = useState<string[]>([]);
+  const [datasPendentes, setDatasPendentes] = useState<string[]>([]);
   const [bloqueios, setBloqueios] = useState<string[]>([]);
+  const janela = janelaDeReserva();
   const [data, setData] = useState("");
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
@@ -62,8 +66,13 @@ function Home() {
   const [erroEnvio, setErroEnvio] = useState(false);
 
   async function carregar() {
-    const [novasDatas, novosBloqueios] = await Promise.all([lerDatasOcupadas(), lerBloqueios()]);
+    const [novasDatas, novasPendentes, novosBloqueios] = await Promise.all([
+      lerDatasOcupadas(),
+      lerDatasPendentes(),
+      lerBloqueios(),
+    ]);
     setDatasOcupadas(novasDatas);
+    setDatasPendentes(novasPendentes);
     setBloqueios(novosBloqueios);
   }
 
@@ -196,9 +205,19 @@ function Home() {
             Diária de referência: <strong>R$ {CONFIG.valorDiaria}</strong> ({CONFIG.horario}). As
             datas em vermelho já estão ocupadas.
           </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Reservas abertas de {formatarData(janela.min)} até {formatarData(janela.max)}.
+          </p>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
-            <Calendario indisponiveis={indisponiveis} selecionada={data} onSelecionar={setData} />
+            <Calendario
+              indisponiveis={indisponiveis}
+              pendentes={new Set(datasPendentes)}
+              dataMinima={janela.min}
+              dataMaxima={janela.max}
+              selecionada={data}
+              onSelecionar={setData}
+            />
 
             <form
               onSubmit={enviar}

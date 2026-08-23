@@ -42,7 +42,7 @@ function Admin() {
   const [logado, setLogado] = useState(false);
   const [verificandoSessao, setVerificandoSessao] = useState(true);
   const [senha, setSenha] = useState("");
-  const [erro, setErro] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
   const [entrando, setEntrando] = useState(false);
 
   const [reservas, setReservas] = useState<Reserva[]>([]);
@@ -60,12 +60,20 @@ function Admin() {
   async function entrar(e: React.FormEvent) {
     e.preventDefault();
     setEntrando(true);
-    setErro(false);
+    setErro(null);
     const resultado = await loginAdmin({ data: { senha } });
     if (resultado.ok) {
       setLogado(true);
+    } else if (resultado.bloqueado) {
+      setErro(
+        `Muitas tentativas erradas. Tente novamente em ${resultado.minutosRestantes} minuto(s).`,
+      );
     } else {
-      setErro(true);
+      setErro(
+        resultado.tentativasRestantes !== undefined
+          ? `Senha incorreta. ${resultado.tentativasRestantes} tentativa(s) restante(s).`
+          : "Senha incorreta.",
+      );
     }
     setEntrando(false);
   }
@@ -127,13 +135,13 @@ function Admin() {
             value={senha}
             onChange={(e) => {
               setSenha(e.target.value);
-              setErro(false);
+              setErro(null);
             }}
             placeholder="Senha"
             autoComplete="current-password"
             className="mt-5 w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground outline-none focus:border-ring"
           />
-          {erro && <p className="mt-2 text-sm text-destructive">Senha incorreta.</p>}
+          {erro && <p className="mt-2 text-sm text-destructive">{erro}</p>}
           <button
             type="submit"
             disabled={entrando}
@@ -237,6 +245,7 @@ function Admin() {
           <Calendario
             modoAdmin
             indisponiveis={datasIndisponiveisAdmin(reservas, bloqueios)}
+            pendentes={new Set(reservas.filter((r) => r.status === "pendente").map((r) => r.data))}
             onSelecionar={alternarBloqueio}
           />
         </div>

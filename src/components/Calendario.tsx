@@ -8,14 +8,28 @@ const MESES = [
 const DIAS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
 type Props = {
+  /** Datas ocupadas de verdade (aprovadas ou bloqueadas pelo admin) */
   indisponiveis: Set<string>;
+  /** Datas com solicitação aguardando aprovação (ainda não confirmadas) */
+  pendentes?: Set<string>;
   selecionada?: string;
   onSelecionar?: (data: string) => void;
   /** No modo admin é possível clicar em qualquer data, inclusive as ocupadas */
   modoAdmin?: boolean;
+  /** Fora desse período (formato AAAA-MM-DD) a data fica bloqueada pro cliente */
+  dataMinima?: string;
+  dataMaxima?: string;
 };
 
-export function Calendario({ indisponiveis, selecionada, onSelecionar, modoAdmin }: Props) {
+export function Calendario({
+  indisponiveis,
+  pendentes,
+  selecionada,
+  onSelecionar,
+  modoAdmin,
+  dataMinima,
+  dataMaxima,
+}: Props) {
   const hoje = new Date();
   const [mes, setMes] = useState(hoje.getMonth());
   const [ano, setAno] = useState(hoje.getFullYear());
@@ -29,6 +43,9 @@ export function Calendario({ indisponiveis, selecionada, onSelecionar, modoAdmin
     setMes(d.getMonth());
     setAno(d.getFullYear());
   }
+
+  const primeiroDiaProximoMes = toISO(new Date(ano, mes + 1, 1));
+  const naoPodeAvancar = !modoAdmin && !!dataMaxima && primeiroDiaProximoMes > dataMaxima;
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
@@ -47,7 +64,8 @@ export function Calendario({ indisponiveis, selecionada, onSelecionar, modoAdmin
         <button
           type="button"
           onClick={() => mudarMes(1)}
-          className="rounded-full px-3 py-1 text-lg text-muted-foreground transition hover:bg-secondary"
+          disabled={naoPodeAvancar}
+          className="rounded-full px-3 py-1 text-lg text-muted-foreground transition hover:bg-secondary disabled:opacity-30"
           aria-label="Próximo mês"
         >
           ›
@@ -67,7 +85,13 @@ export function Calendario({ indisponiveis, selecionada, onSelecionar, modoAdmin
           const iso = toISO(new Date(ano, mes, dia));
           const passado = iso < hojeISO;
           const ocupada = indisponiveis.has(iso);
-          const desabilitada = modoAdmin ? passado : passado || ocupada;
+          const pendente = !ocupada && !!pendentes?.has(iso);
+          const foraDaJanela =
+            !modoAdmin &&
+            ((dataMinima && iso < dataMinima) || (dataMaxima && iso > dataMaxima));
+          const desabilitada = modoAdmin
+            ? passado
+            : passado || ocupada || pendente || foraDaJanela;
           const ativa = selecionada === iso;
 
           return (
@@ -76,15 +100,18 @@ export function Calendario({ indisponiveis, selecionada, onSelecionar, modoAdmin
               type="button"
               disabled={desabilitada || !onSelecionar}
               onClick={() => onSelecionar?.(iso)}
+              title={pendente ? "Reserva em análise" : ocupada ? "Ocupada" : undefined}
               className={[
                 "aspect-square rounded-lg text-sm transition",
                 ativa
                   ? "bg-primary text-primary-foreground"
                   : ocupada
                     ? "bg-destructive/10 text-destructive line-through"
-                    : desabilitada
-                      ? "text-muted-foreground/40"
-                      : "bg-secondary text-secondary-foreground hover:bg-accent",
+                    : pendente
+                      ? "bg-accent/60 text-accent-foreground"
+                      : desabilitada
+                        ? "text-muted-foreground/40"
+                        : "bg-secondary text-secondary-foreground hover:bg-accent",
               ].join(" ")}
             >
               {dia}
@@ -96,6 +123,9 @@ export function Calendario({ indisponiveis, selecionada, onSelecionar, modoAdmin
       <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-2">
           <span className="h-3 w-3 rounded bg-secondary" /> Disponível
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded bg-accent/60" /> Em análise
         </span>
         <span className="flex items-center gap-2">
           <span className="h-3 w-3 rounded bg-destructive/20" /> Ocupada

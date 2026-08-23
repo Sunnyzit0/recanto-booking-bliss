@@ -11,7 +11,10 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 // ---------------------------------------------------------------------------
 
 const COOKIE = "recanto_admin_sessao";
+const COOKIE_TENTATIVAS = "recanto_admin_tentativas";
 const DURACAO_SEGUNDOS = 60 * 60 * 24 * 30; // fica logado por 30 dias
+const MAX_TENTATIVAS = 3;
+const BLOQUEIO_MINUTOS = 30;
 
 function segredoSessao() {
   const s = process.env.SESSION_SECRET;
@@ -46,6 +49,44 @@ function exigirSessaoValida() {
   }
 }
 
+// --- Controle de tentativas de login (trava por 30min após 3 erros) ---
+
+type EstadoTentativas = { contagem: number; bloqueadoAte: number };
+
+function lerTentativas(): EstadoTentativas {
+  const cookie = getCookie(COOKIE_TENTATIVAS);
+  if (!cookie) return { contagem: 0, bloqueadoAte: 0 };
+
+  const [contagemStr, bloqueadoAteStr, assinatura] = cookie.split(".");
+  const esperada = createHmac("sha256", segredoSessao())
+    .update(`tentativas:${contagemStr}:${bloqueadoAteStr}`)
+    .digest("hex");
+
+  const bufA = Buffer.from(assinatura || "", "hex");
+  const bufB = Buffer.from(esperada, "hex");
+  if (bufA.length !== bufB.length || !timingSafeEqual(bufA, bufB)) {
+    return { contagem: 0, bloqueadoAte: 0 };
+  }
+  return { contagem: Number(contagemStr) || 0, bloqueadoAte: Number(bloqueadoAteStr) || 0 };
+}
+
+function salvarTentativas(estado: EstadoTentativas) {
+  const assinatura = createHmac("sha256", segredoSessao())
+    .update(`tentativas:${estado.contagem}:${estado.bloqueadoAte}`)
+    .digest("hex");
+  setCookie(COOKIE_TENTATIVAS, `${estado.contagem}.${estado.bloqueadoAte}.${assinatura}`, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/",
+    maxAge: BLOQUEIO_MINUTOS * 60,
+  });
+}
+
+function limparTentativas() {
+  deleteCookie(COOKIE_TENTATIVAS, { path: "/" });
+}
+
 /** Cliente do Supabase com acesso total (só usado aqui, no servidor) */
 function supabaseAdmin() {
   const url = process.env.VITE_SUPABASE_URL;
@@ -66,11 +107,27 @@ export const loginAdmin = createServerFn({ method: "POST" })
     const senhaCorreta = process.env.ADMIN_PASSWORD;
     if (!senhaCorreta) throw new Error("ADMIN_PASSWORD não configurada no servidor.");
 
-    if (data.senha !== senhaCorreta) {
-      return { ok: false };
+    const tentativas = lerTentativas();
+    const agora = Date.now();
+
+    if (tentativas.bloqueadoAte > agora) {
+      const minutosRestantes = Math.ceil((tentativas.bloqueadoAte - agora) / 60_000);
+      return { ok: false, bloqueado: true, minutosRestantes };
     }
 
-    const expiraEm = Date.now() + DURACAO_SEGUNDOS * 1000;
+    if (data.senha !== senhaCorreta) {
+      const novaContagem = tentativas.contagem + 1;
+      if (novaContagem >= MAX_TENTATIVAS) {
+        salvarTentativas({ contagem: 0, bloqueadoAte: agora + BLOQUEIO_MINUTOS * 60_000 });
+        return { ok: false, bloqueado: true, minutosRestantes: BLOQUEIO_MINUTOS };
+      }
+      salvarTentativas({ contagem: novaContagem, bloqueadoAte: 0 });
+      return { ok: false, bloqueado: false, tentativasRestantes: MAX_TENTATIVAS - novaContagem };
+    }
+
+    limparTentativas();
+
+    const expiraEm = agora + DURACAO_SEGUNDOS * 1000;
     const token = `${expiraEm}.${assinar(expiraEm)}`;
 
     setCookie(COOKIE, token, {

@@ -69,6 +69,32 @@ export async function lerDatasOcupadas(): Promise<string[]> {
   return (data ?? []).map((r: { data: string }) => r.data);
 }
 
+/**
+ * Retorna as datas com solicitação PENDENTE (aguardando aprovação do
+ * admin), sem nome/telefone — usado pra mostrar "Em análise" no calendário.
+ */
+export async function lerDatasPendentes(): Promise<string[]> {
+  const { data, error } = await supabase.rpc("datas_pendentes");
+  if (error) {
+    console.error("Erro ao ler datas pendentes:", error.message);
+    return [];
+  }
+  return (data ?? []).map((r: { data: string }) => r.data);
+}
+
+/**
+ * Janela de datas permitida pro cliente reservar: só os PRÓXIMOS 2
+ * meses, sem contar o mês atual. Ex.: hoje em agosto → libera só
+ * setembro e outubro. O mesmo limite também é aplicado no banco de
+ * dados (não depende só disso aqui pra ser seguro).
+ */
+export function janelaDeReserva(): { min: string; max: string } {
+  const hoje = new Date();
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
+  const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 3, 0);
+  return { min: toISO(inicio), max: toISO(fim) };
+}
+
 /** Datas bloqueadas manualmente pelo dono (não contém dados sensíveis) */
 export async function lerBloqueios(): Promise<string[]> {
   const { data, error } = await supabase.from("bloqueios").select("data");
