@@ -178,6 +178,20 @@ export const atualizarReservaAdmin = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/**
+ * Atualiza várias reservas de uma vez (usado quando o cliente pediu
+ * mais de uma data no mesmo pedido — aprovar/recusar afeta todas as
+ * datas do grupo junto).
+ */
+export const atualizarVariasReservasAdmin = createServerFn({ method: "POST" })
+  .validator((d: { ids: string[]; mudanca: Record<string, unknown> }) => d)
+  .handler(async ({ data }) => {
+    exigirSessaoValida();
+    const { error } = await supabaseAdmin().from("reservas").update(data.mudanca).in("id", data.ids);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 export const alternarBloqueioAdmin = createServerFn({ method: "POST" })
   .validator((d: { data: string; jaBloqueada: boolean }) => d)
   .handler(async ({ data }) => {

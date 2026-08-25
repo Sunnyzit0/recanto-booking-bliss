@@ -9,14 +9,24 @@ export const CONFIG = {
   telefone: "(61) 99883-4734",
   whatsapp: "5561998834734",
   cidade: "Padre Bernardo - GO, Setor Leste",
-  capacidade: "cerca de 15 pessoas",
-  valorDiaria: 200, // R$ por diária — altere aqui
-  horario: "das 8h às 22h",
+  capacidade: "até 40 pessoas",
+  horario: "das 8h às 20h (12 horas)",
   pagamento: "Pix ou dinheiro",
-  cancelamento: "Cancelamento gratuito até 24h antes da data reservada.",
+  cancelamento: "Cancelamento gratuito até 7 dias antes da data reservada.",
   // O login do admin agora é feito por senha única, verificada no
-  // servidor (variável de ambiente ADMIN_PASSWORD) — veja src/server/admin.ts.
+  // servidor (variável de ambiente ADMIN_PASSWORD) — veja src/lib/admin-actions.ts.
 };
+
+/**
+ * Valor da diária: R$200 até 30/09/2026, R$600 a partir de 01/10/2026.
+ * O valor usado é sempre o da DATA DA RESERVA (não o dia em que a
+ * pessoa está reservando) — reservas para outubro já saem por R$600,
+ * mesmo se pedidas ainda em agosto/setembro.
+ */
+export function calcularValorDiaria(dataISO: string): number {
+  const DATA_DO_REAJUSTE = "2026-10-01";
+  return dataISO >= DATA_DO_REAJUSTE ? 600 : 200;
+}
 
 export type Status = "pendente" | "aprovada" | "recusada";
 
@@ -28,6 +38,7 @@ export type Reserva = {
   valor: number;
   horario: string;
   status: Status;
+  grupo_id?: string | null;
 };
 
 export function toISO(d: Date) {
@@ -43,16 +54,36 @@ export function formatarData(iso: string) {
 
 // --- Funções usadas pela página PÚBLICA (sem login, chave anônima) ---
 
-/** Cria uma nova solicitação de reserva (formulário do cliente) */
-export async function criarReserva(reserva: Omit<Reserva, "id" | "status">) {
-  const { error } = await supabase.from("reservas").insert({
-    nome: reserva.nome,
-    telefone: reserva.telefone,
-    data: reserva.data,
-    valor: reserva.valor,
-    horario: reserva.horario,
-    status: "pendente",
-  });
+export type SolicitacaoInput = {
+  nome: string;
+  telefone: string;
+  datas: string[]; // 1 a 3 datas (AAAA-MM-DD)
+  horario: string;
+};
+
+/**
+ * Cria uma solicitação de reserva — o cliente pode escolher de 1 a 3
+ * datas de uma vez. Todas as datas ficam ligadas por um "grupo_id",
+ * pra aparecerem juntas no painel do admin e serem aprovadas/recusadas
+ * em conjunto. O valor de cada dia é calculado individualmente (útil
+ * quando o pedido cruza a data do reajuste de preço); o desconto por
+ * pacote é combinado diretamente entre o dono e o cliente.
+ */
+export async function criarSolicitacao({ nome, telefone, datas, horario }: SolicitacaoInput) {
+  if (datas.length < 1 || datas.length > 3) {
+    throw new Error("Escolha de 1 a 3 datas.");
+  }
+  const grupoId = crypto.randomUUID();
+  const linhas = datas.map((data) => ({
+    nome,
+    telefone,
+    data,
+    valor: calcularValorDiaria(data),
+    horario,
+    status: "pendente" as const,
+    grupo_id: grupoId,
+  }));
+  const { error } = await supabase.from("reservas").insert(linhas);
   if (error) throw new Error(error.message);
 }
 
@@ -83,15 +114,15 @@ export async function lerDatasPendentes(): Promise<string[]> {
 }
 
 /**
- * Janela de datas permitida pro cliente reservar: só os PRÓXIMOS 2
- * meses, sem contar o mês atual. Ex.: hoje em agosto → libera só
- * setembro e outubro. O mesmo limite também é aplicado no banco de
- * dados (não depende só disso aqui pra ser seguro).
+ * Janela de datas permitida pro cliente reservar: só os PRÓXIMOS 6
+ * meses, sem contar o mês atual. Ex.: hoje em agosto → libera de
+ * setembro até fevereiro. O mesmo limite também é aplicado no banco
+ * de dados (não depende só disso aqui pra ser seguro).
  */
 export function janelaDeReserva(): { min: string; max: string } {
   const hoje = new Date();
   const inicio = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
-  const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 3, 0);
+  const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 7, 0);
   return { min: toISO(inicio), max: toISO(fim) };
 }
 

@@ -8,11 +8,13 @@ const MESES = [
 const DIAS = ["D", "S", "T", "Q", "Q", "S", "S"];
 
 type Props = {
-  /** Datas ocupadas de verdade (aprovadas ou bloqueadas pelo admin) */
-  indisponiveis: Set<string>;
+  /** Datas com reserva já APROVADA (confirmada por um cliente) */
+  reservadas: Set<string>;
   /** Datas com solicitação aguardando aprovação (ainda não confirmadas) */
   pendentes?: Set<string>;
-  selecionada?: string;
+  /** Datas bloqueadas manualmente pelo admin (sem reserva de cliente) */
+  indisponivelAdmin?: Set<string>;
+  selecionadas?: Set<string>;
   onSelecionar?: (data: string) => void;
   /** No modo admin é possível clicar em qualquer data, inclusive as ocupadas */
   modoAdmin?: boolean;
@@ -21,10 +23,13 @@ type Props = {
   dataMaxima?: string;
 };
 
+type Estado = "disponivel" | "pendente" | "reservada" | "indisponivel";
+
 export function Calendario({
-  indisponiveis,
+  reservadas,
   pendentes,
-  selecionada,
+  indisponivelAdmin,
+  selecionadas,
   onSelecionar,
   modoAdmin,
   dataMinima,
@@ -46,6 +51,27 @@ export function Calendario({
 
   const primeiroDiaProximoMes = toISO(new Date(ano, mes + 1, 1));
   const naoPodeAvancar = !modoAdmin && !!dataMaxima && primeiroDiaProximoMes > dataMaxima;
+
+  function estadoDoDia(iso: string): Estado {
+    if (reservadas.has(iso)) return "reservada";
+    if (indisponivelAdmin?.has(iso)) return "indisponivel";
+    if (pendentes?.has(iso)) return "pendente";
+    return "disponivel";
+  }
+
+  const ESTILOS: Record<Estado, string> = {
+    disponivel: "bg-secondary text-secondary-foreground hover:bg-accent",
+    pendente: "bg-accent/60 text-accent-foreground",
+    reservada: "bg-destructive/10 text-destructive line-through",
+    indisponivel: "bg-muted text-muted-foreground/60 line-through",
+  };
+
+  const TITULOS: Record<Estado, string | undefined> = {
+    disponivel: undefined,
+    pendente: "Reserva em análise",
+    reservada: "Já reservada",
+    indisponivel: "Indisponível",
+  };
 
   return (
     <div className="rounded-2xl border border-border bg-card p-4 shadow-soft sm:p-6">
@@ -84,15 +110,14 @@ export function Calendario({
           const dia = i + 1;
           const iso = toISO(new Date(ano, mes, dia));
           const passado = iso < hojeISO;
-          const ocupada = indisponiveis.has(iso);
-          const pendente = !ocupada && !!pendentes?.has(iso);
+          const estado = estadoDoDia(iso);
           const foraDaJanela =
             !modoAdmin &&
             ((dataMinima && iso < dataMinima) || (dataMaxima && iso > dataMaxima));
           const desabilitada = modoAdmin
             ? passado
-            : passado || ocupada || pendente || foraDaJanela;
-          const ativa = selecionada === iso;
+            : passado || estado !== "disponivel" || foraDaJanela;
+          const ativa = selecionadas?.has(iso) ?? false;
 
           return (
             <button
@@ -100,18 +125,16 @@ export function Calendario({
               type="button"
               disabled={desabilitada || !onSelecionar}
               onClick={() => onSelecionar?.(iso)}
-              title={pendente ? "Reserva em análise" : ocupada ? "Ocupada" : undefined}
+              title={TITULOS[estado]}
               className={[
                 "aspect-square rounded-lg text-sm transition",
                 ativa
                   ? "bg-primary text-primary-foreground"
-                  : ocupada
-                    ? "bg-destructive/10 text-destructive line-through"
-                    : pendente
-                      ? "bg-accent/60 text-accent-foreground"
-                      : desabilitada
-                        ? "text-muted-foreground/40"
-                        : "bg-secondary text-secondary-foreground hover:bg-accent",
+                  : estado !== "disponivel"
+                    ? ESTILOS[estado]
+                    : desabilitada
+                      ? "text-muted-foreground/40"
+                      : ESTILOS.disponivel,
               ].join(" ")}
             >
               {dia}
@@ -128,7 +151,10 @@ export function Calendario({
           <span className="h-3 w-3 rounded bg-accent/60" /> Em análise
         </span>
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-destructive/20" /> Ocupada
+          <span className="h-3 w-3 rounded bg-destructive/20" /> Reservada
+        </span>
+        <span className="flex items-center gap-2">
+          <span className="h-3 w-3 rounded bg-muted" /> Indisponível
         </span>
       </div>
     </div>

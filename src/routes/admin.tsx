@@ -4,6 +4,7 @@ import { Calendario } from "@/components/Calendario";
 import {
   alternarBloqueioAdmin,
   atualizarReservaAdmin,
+  atualizarVariasReservasAdmin,
   listarBloqueiosAdmin,
   listarReservasAdmin,
   loginAdmin,
@@ -30,13 +31,6 @@ const CORES: Record<Status, string> = {
   aprovada: "bg-leaf/15 text-leaf",
   recusada: "bg-destructive/10 text-destructive",
 };
-
-function datasIndisponiveisAdmin(reservas: Reserva[], bloqueios: string[]) {
-  return new Set([
-    ...bloqueios,
-    ...reservas.filter((r) => r.status === "aprovada").map((r) => r.data),
-  ]);
-}
 
 function Admin() {
   const [logado, setLogado] = useState(false);
@@ -105,6 +99,21 @@ function Admin() {
   async function atualizar(id: string, mudanca: Partial<Reserva>) {
     setReservas((atual) => atual.map((r) => (r.id === id ? { ...r, ...mudanca } : r)));
     await atualizarReservaAdmin({ data: { id, mudanca } });
+  }
+
+  async function atualizarGrupo(ids: string[], mudanca: Partial<Reserva>) {
+    setReservas((atual) => atual.map((r) => (ids.includes(r.id) ? { ...r, ...mudanca } : r)));
+    await atualizarVariasReservasAdmin({ data: { ids, mudanca } });
+  }
+
+  /** Agrupa as reservas que vieram do mesmo pedido (mesmo grupo_id) */
+  function agruparReservas(lista: Reserva[]) {
+    const grupos = new Map<string, Reserva[]>();
+    for (const r of lista) {
+      const chave = r.grupo_id ?? r.id;
+      grupos.set(chave, [...(grupos.get(chave) ?? []), r]);
+    }
+    return Array.from(grupos.values());
   }
 
   async function alternarBloqueio(data: string) {
@@ -176,63 +185,79 @@ function Admin() {
           {!carregando && reservas.length === 0 && (
             <p className="text-sm text-muted-foreground">Nenhuma solicitação recebida ainda.</p>
           )}
-          {reservas.map((r) => (
-            <div key={r.id} className="shadow-soft rounded-2xl border border-border bg-card p-5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="font-medium text-foreground">{r.nome}</p>
-                  <p className="text-sm text-muted-foreground">📞 {r.telefone}</p>
+          {agruparReservas(reservas).map((grupo) => {
+            const primeira = grupo[0];
+            const ids = grupo.map((r) => r.id);
+            const valorTotal = grupo.reduce((soma, r) => soma + r.valor, 0);
+            return (
+              <div key={ids.join("-")} className="shadow-soft rounded-2xl border border-border bg-card p-5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-medium text-foreground">{primeira.nome}</p>
+                    <p className="text-sm text-muted-foreground">📞 {primeira.telefone}</p>
+                  </div>
+                  <span className={`rounded-full px-3 py-1 text-xs capitalize ${CORES[primeira.status]}`}>
+                    {primeira.status}
+                  </span>
                 </div>
-                <span className={`rounded-full px-3 py-1 text-xs capitalize ${CORES[r.status]}`}>
-                  {r.status}
-                </span>
-              </div>
 
-              <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                <label className="text-xs text-muted-foreground">
-                  Data ({formatarData(r.data)})
-                  <input
-                    type="date"
-                    value={r.data}
-                    onChange={(e) => atualizar(r.id, { data: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
-                  />
-                </label>
-                <label className="text-xs text-muted-foreground">
-                  Valor (R$)
-                  <input
-                    type="number"
-                    value={r.valor}
-                    onChange={(e) => atualizar(r.id, { valor: Number(e.target.value) })}
-                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
-                  />
-                </label>
-                <label className="text-xs text-muted-foreground">
-                  Horário
-                  <input
-                    value={r.horario}
-                    onChange={(e) => atualizar(r.id, { horario: e.target.value })}
-                    className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
-                  />
-                </label>
-              </div>
+                {grupo.length > 1 && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Pedido com {grupo.length} datas — total de referência R$ {valorTotal} (desconto a
+                    combinar)
+                  </p>
+                )}
 
-              <div className="mt-4 flex gap-3">
-                <button
-                  onClick={() => atualizar(r.id, { status: "aprovada" })}
-                  className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
-                >
-                  Aprovar
-                </button>
-                <button
-                  onClick={() => atualizar(r.id, { status: "recusada" })}
-                  className="rounded-full border border-input px-5 py-2 text-sm text-foreground transition hover:bg-secondary"
-                >
-                  Recusar
-                </button>
+                <div className="mt-4 space-y-3">
+                  {grupo.map((r) => (
+                    <div key={r.id} className="grid gap-3 rounded-xl bg-secondary/40 p-3 sm:grid-cols-3">
+                      <label className="text-xs text-muted-foreground">
+                        Data ({formatarData(r.data)})
+                        <input
+                          type="date"
+                          value={r.data}
+                          onChange={(e) => atualizar(r.id, { data: e.target.value })}
+                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                        />
+                      </label>
+                      <label className="text-xs text-muted-foreground">
+                        Valor (R$)
+                        <input
+                          type="number"
+                          value={r.valor}
+                          onChange={(e) => atualizar(r.id, { valor: Number(e.target.value) })}
+                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                        />
+                      </label>
+                      <label className="text-xs text-muted-foreground">
+                        Horário
+                        <input
+                          value={r.horario}
+                          onChange={(e) => atualizar(r.id, { horario: e.target.value })}
+                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                        />
+                      </label>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-4 flex gap-3">
+                  <button
+                    onClick={() => atualizarGrupo(ids, { status: "aprovada" })}
+                    className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
+                  >
+                    {grupo.length > 1 ? "Aprovar todas" : "Aprovar"}
+                  </button>
+                  <button
+                    onClick={() => atualizarGrupo(ids, { status: "recusada" })}
+                    className="rounded-full border border-input px-5 py-2 text-sm text-foreground transition hover:bg-secondary"
+                  >
+                    {grupo.length > 1 ? "Recusar todas" : "Recusar"}
+                  </button>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -244,8 +269,9 @@ function Admin() {
         <div className="mt-4 max-w-md">
           <Calendario
             modoAdmin
-            indisponiveis={datasIndisponiveisAdmin(reservas, bloqueios)}
+            reservadas={new Set(reservas.filter((r) => r.status === "aprovada").map((r) => r.data))}
             pendentes={new Set(reservas.filter((r) => r.status === "pendente").map((r) => r.data))}
+            indisponivelAdmin={new Set(bloqueios)}
             onSelecionar={alternarBloqueio}
           />
         </div>

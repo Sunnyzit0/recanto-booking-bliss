@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { Calendario } from "@/components/Calendario";
 import {
   CONFIG,
-  criarReserva,
+  calcularValorDiaria,
+  criarSolicitacao,
   escutarBloqueios,
   formatarData,
   janelaDeReserva,
@@ -58,12 +59,13 @@ function Home() {
   const [datasPendentes, setDatasPendentes] = useState<string[]>([]);
   const [bloqueios, setBloqueios] = useState<string[]>([]);
   const janela = janelaDeReserva();
-  const [data, setData] = useState("");
+  const MAX_DATAS = 3;
+  const [datasEscolhidas, setDatasEscolhidas] = useState<string[]>([]);
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
   const [enviada, setEnviada] = useState(false);
   const [enviando, setEnviando] = useState(false);
-  const [erroEnvio, setErroEnvio] = useState(false);
+  const [erroEnvio, setErroEnvio] = useState<string | null>(null);
 
   async function carregar() {
     const [novasDatas, novasPendentes, novosBloqueios] = await Promise.all([
@@ -88,28 +90,44 @@ function Home() {
     };
   }, []);
 
-  const indisponiveis = new Set([...bloqueios, ...datasOcupadas]);
+  const reservadas = new Set(datasOcupadas);
+  const indisponivelAdmin = new Set(bloqueios);
+  const pendentes = new Set(datasPendentes);
+
+  function alternarData(iso: string) {
+    setDatasEscolhidas((atual) => {
+      if (atual.includes(iso)) return atual.filter((d) => d !== iso);
+      if (atual.length >= MAX_DATAS) return atual;
+      return [...atual, iso].sort();
+    });
+  }
+
+  const valorTotal = datasEscolhidas.reduce((soma, d) => soma + calcularValorDiaria(d), 0);
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    if (!nome || !telefone || !data) return;
+    if (!nome || !telefone || datasEscolhidas.length === 0) return;
+    const foraDaJanela = datasEscolhidas.some((d) => d < janela.min || d > janela.max);
+    if (foraDaJanela) {
+      setErroEnvio("Uma das datas escolhidas está fora do período permitido.");
+      return;
+    }
     setEnviando(true);
-    setErroEnvio(false);
+    setErroEnvio(null);
     try {
-      await criarReserva({
+      await criarSolicitacao({
         nome,
         telefone,
-        data,
-        valor: CONFIG.valorDiaria,
+        datas: datasEscolhidas,
         horario: CONFIG.horario,
       });
       setEnviada(true);
       setNome("");
       setTelefone("");
-      setData("");
+      setDatasEscolhidas([]);
     } catch (erro) {
       console.error(erro);
-      setErroEnvio(true);
+      setErroEnvio("Não foi possível enviar sua solicitação. Tente novamente ou chame no WhatsApp.");
     } finally {
       setEnviando(false);
     }
@@ -202,21 +220,24 @@ function Home() {
         <div className="mx-auto max-w-5xl px-4">
           <h2 className="font-display text-3xl text-foreground">Reserve sua data</h2>
           <p className="mt-2 text-muted-foreground">
-            Diária de referência: <strong>R$ {CONFIG.valorDiaria}</strong> ({CONFIG.horario}). As
-            datas em vermelho já estão ocupadas.
+            Diária: <strong>R$ 200</strong> até 30/09, <strong>R$ 600</strong> a partir de 01/10 (
+            {CONFIG.horario}).
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Reservas abertas de {formatarData(janela.min)} até {formatarData(janela.max)}.
+            Reservas abertas de {formatarData(janela.min)} até {formatarData(janela.max)}. Escolha
+            de 1 a {MAX_DATAS} datas — para pacotes de 2 ou mais dias, o desconto é combinado
+            diretamente com o dono do espaço.
           </p>
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             <Calendario
-              indisponiveis={indisponiveis}
-              pendentes={new Set(datasPendentes)}
+              reservadas={reservadas}
+              pendentes={pendentes}
+              indisponivelAdmin={indisponivelAdmin}
               dataMinima={janela.min}
               dataMaxima={janela.max}
-              selecionada={data}
-              onSelecionar={setData}
+              selecionadas={new Set(datasEscolhidas)}
+              onSelecionar={alternarData}
             />
 
             <form
@@ -246,20 +267,41 @@ function Home() {
                 />
               </label>
 
-              <label className="text-sm text-muted-foreground">
-                Data desejada
-                <input
-                  type="date"
-                  value={data}
-                  onChange={(e) => setData(e.target.value)}
-                  required
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground outline-none focus:border-ring"
-                />
-              </label>
+              <div className="text-sm text-muted-foreground">
+                Datas escolhidas ({datasEscolhidas.length}/{MAX_DATAS})
+                {datasEscolhidas.length === 0 ? (
+                  <p className="mt-1 text-foreground">Clique no calendário ao lado para escolher.</p>
+                ) : (
+                  <ul className="mt-1 space-y-1">
+                    {datasEscolhidas.map((d) => (
+                      <li key={d} className="flex items-center justify-between rounded-lg bg-secondary px-3 py-2 text-foreground">
+                        <span>{formatarData(d)}</span>
+                        <span className="flex items-center gap-2">
+                          R$ {calcularValorDiaria(d)}
+                          <button
+                            type="button"
+                            onClick={() => alternarData(d)}
+                            className="text-destructive hover:underline"
+                            aria-label={`Remover ${formatarData(d)}`}
+                          >
+                            remover
+                          </button>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {datasEscolhidas.length > 0 && (
+                  <p className="mt-2 font-medium text-foreground">
+                    Total de referência: R$ {valorTotal}
+                    {datasEscolhidas.length > 1 && " (desconto a combinar)"}
+                  </p>
+                )}
+              </div>
 
               <button
                 type="submit"
-                disabled={enviando}
+                disabled={enviando || datasEscolhidas.length === 0}
                 className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
               >
                 {enviando ? "Enviando..." : "Enviar solicitação"}
@@ -274,7 +316,7 @@ function Home() {
 
               {erroEnvio && (
                 <p className="rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
-                  Não foi possível enviar sua solicitação. Tente novamente ou chame no WhatsApp.
+                  {erroEnvio}
                 </p>
               )}
 
