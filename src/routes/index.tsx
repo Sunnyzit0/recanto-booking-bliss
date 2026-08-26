@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Calendario } from "@/components/Calendario";
+import { BotaoTema } from "@/components/BotaoTema";
 import {
   CONFIG,
   calcularValorDiaria,
@@ -150,6 +151,7 @@ function Home() {
             <Link to="/admin" className="text-muted-foreground transition hover:text-foreground">
               Admin
             </Link>
+            <BotaoTema />
           </nav>
         </div>
       </header>
@@ -220,8 +222,7 @@ function Home() {
         <div className="mx-auto max-w-5xl px-4">
           <h2 className="font-display text-3xl text-foreground">Reserve sua data</h2>
           <p className="mt-2 text-muted-foreground">
-            Diária: <strong>R$ 200</strong> até 30/09, <strong>R$ 600</strong> a partir de 01/10 (
-            {CONFIG.horario}).
+            Diária: <strong>R$ 600</strong> ({CONFIG.horario}).
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Reservas abertas de {formatarData(janela.min)} até {formatarData(janela.max)}. Escolha
@@ -337,16 +338,27 @@ function Home() {
       {/* Contato */}
       <footer className="mx-auto max-w-5xl px-4 py-14">
         <h2 className="font-display text-3xl text-foreground">Onde estamos</h2>
-        <p className="mt-3 text-muted-foreground">{CONFIG.cidade}</p>
+        <p className="mt-3 text-muted-foreground">{CONFIG.endereco}</p>
+        <p className="mt-1 text-muted-foreground">{CONFIG.cidade}</p>
         <p className="mt-1 text-muted-foreground">Telefone: {CONFIG.telefone}</p>
-        <a
-          href={`https://wa.me/${CONFIG.whatsapp}`}
-          target="_blank"
-          rel="noreferrer"
-          className="mt-5 inline-block rounded-full bg-leaf px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90"
-        >
-          Falar no WhatsApp
-        </a>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <a
+            href={`https://wa.me/${CONFIG.whatsapp}`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block rounded-full bg-leaf px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+          >
+            Falar no WhatsApp
+          </a>
+          <a
+            href={CONFIG.linkGoogleMaps}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-block rounded-full border border-input px-6 py-3 text-sm font-medium text-foreground transition hover:bg-secondary"
+          >
+            Ver no mapa
+          </a>
+        </div>
       </footer>
     </main>
   );

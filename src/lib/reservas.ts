@@ -9,6 +9,10 @@ export const CONFIG = {
   telefone: "(61) 99883-4734",
   whatsapp: "5561998834734",
   cidade: "Padre Bernardo - GO, Setor Leste",
+  endereco: "Rua 41, Lote 03, Setor Leste",
+  linkGoogleMaps:
+    "https://www.google.com/maps/search/?api=1&query=" +
+    encodeURIComponent("Rua 41, Lote 03, Setor Leste, Padre Bernardo, GO"),
   capacidade: "até 40 pessoas",
   horario: "das 8h às 20h (12 horas)",
   pagamento: "Pix ou dinheiro",
@@ -17,15 +21,9 @@ export const CONFIG = {
   // servidor (variável de ambiente ADMIN_PASSWORD) — veja src/lib/admin-actions.ts.
 };
 
-/**
- * Valor da diária: R$200 até 30/09/2026, R$600 a partir de 01/10/2026.
- * O valor usado é sempre o da DATA DA RESERVA (não o dia em que a
- * pessoa está reservando) — reservas para outubro já saem por R$600,
- * mesmo se pedidas ainda em agosto/setembro.
- */
-export function calcularValorDiaria(dataISO: string): number {
-  const DATA_DO_REAJUSTE = "2026-10-01";
-  return dataISO >= DATA_DO_REAJUSTE ? 600 : 200;
+/** Valor da diária: R$600, fixo. */
+export function calcularValorDiaria(_dataISO: string): number {
+  return 600;
 }
 
 export type Status = "pendente" | "aprovada" | "recusada";

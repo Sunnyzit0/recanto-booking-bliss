@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Calendario } from "@/components/Calendario";
+import { BotaoTema } from "@/components/BotaoTema";
 import {
   alternarBloqueioAdmin,
   atualizarReservaAdmin,
@@ -170,11 +171,12 @@ function Admin() {
     <main className="mx-auto max-w-5xl px-4 py-10">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="font-display text-3xl text-foreground">Painel de reservas</h1>
-        <div className="flex gap-4 text-sm">
+        <div className="flex items-center gap-4 text-sm">
           <Link to="/" className="text-muted-foreground hover:underline">Ver site</Link>
           <button onClick={sair} className="text-muted-foreground hover:underline">
             Sair
           </button>
+          <BotaoTema />
         </div>
       </div>
 
