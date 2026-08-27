@@ -42,11 +42,11 @@ export const Route = createFileRoute("/")({
 
 const DIFERENCIAIS = [
   { titulo: "Piscina com cascata", texto: "Piscina ampla com chafariz decorativo e iluminação à noite." },
-  { titulo: "Churrasqueira de alvenaria", texto: "Forno e churrasqueira prontos para o dia inteiro de festa." },
+  { titulo: "Churrasqueira e fogão a lenha", texto: "Fogão a lenha, forno e churrasqueira prontos para o dia inteiro de festa." },
   { titulo: "Área gourmet", texto: "Cooktop, pia e bancada de mármore com mesa e banco rústicos." },
-  { titulo: "Estacionamento coberto", texto: "Bastante espaço coberto para os carros dos convidados." },
+  { titulo: "Espaço amplo", texto: "Bastante espaço externo para receber os convidados com conforto." },
   { titulo: "Wi-fi liberado", texto: "Internet disponível em todo o espaço." },
-  { titulo: "Cercado de verde", texto: "Ambiente tranquilo, rodeado de plantas e vegetação." },
+  { titulo: "Lugar tranquilo", texto: "Ambiente calmo, ideal para relaxar e aproveitar o dia com quem você ama." },
 ];
 
 const FOTOS = [
@@ -166,25 +166,25 @@ function Home() {
           alt="Piscina do Recanto da Piscina em dia de sol"
           className="h-[68vh] min-h-[26rem] w-full object-cover"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/40 to-primary/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/45 to-black/20" />
         <div className="absolute inset-0 flex items-center justify-center px-4">
-          <div className="max-w-2xl text-center text-primary-foreground">
-            <span className="inline-flex items-center gap-2 rounded-full bg-background/15 px-4 py-1.5 text-xs tracking-[0.25em] uppercase backdrop-blur-sm">
+          <div className="max-w-2xl text-center text-white">
+            <span className="inline-flex items-center gap-2 rounded-full bg-black/30 px-4 py-1.5 text-xs tracking-[0.25em] uppercase backdrop-blur-sm">
               <MapPin className="h-3.5 w-3.5" />
               {CONFIG.cidade}
             </span>
             <h1 className="font-display mt-5 text-5xl leading-[1.05] sm:text-7xl">{CONFIG.nome}</h1>
-            <p className="font-display mt-2 text-lg tracking-[0.35em] uppercase opacity-90 sm:text-xl">
+            <p className="font-display mt-2 text-lg tracking-[0.35em] uppercase text-white/90 sm:text-xl">
               {CONFIG.subtitulo}
             </p>
-            <p className="mx-auto mt-5 max-w-md text-base opacity-95 sm:text-lg">
+            <p className="mx-auto mt-5 max-w-md text-base text-white/95 sm:text-lg">
               Um refúgio cercado de verde para reunir a família e celebrar momentos com
               tranquilidade.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <a
                 href="#reservar"
-                className="shadow-soft inline-block rounded-full bg-background px-7 py-3 text-sm font-medium text-foreground transition hover:bg-secondary"
+                className="shadow-soft inline-block rounded-full bg-white px-7 py-3 text-sm font-medium text-foreground transition hover:bg-white/90"
               >
                 Ver datas disponíveis
               </a>
@@ -192,7 +192,7 @@ function Home() {
                 href={`https://wa.me/${CONFIG.whatsapp}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-2 rounded-full border border-primary-foreground/40 px-7 py-3 text-sm font-medium transition hover:bg-background/10"
+                className="inline-flex items-center gap-2 rounded-full border border-white/50 px-7 py-3 text-sm font-medium text-white transition hover:bg-white/10"
               >
                 <MessageCircle className="h-4 w-4" />
                 WhatsApp
@@ -219,9 +219,9 @@ function Home() {
         <h2 className="font-display text-3xl text-foreground">Sobre o espaço</h2>
         <p className="mt-4 max-w-3xl text-muted-foreground">
           Espaço para alugar por diária, com capacidade para {CONFIG.capacidade} (pode passar um
-          pouco disso). O aluguel inclui toda a estrutura: piscina com cascata, churrasqueira de
-          alvenaria, área gourmet completa, estacionamento coberto e wi-fi. Ideal para encontros de
-          família, momentos de lazer e pré-eventos como chá de bebê e despedida de solteiro.
+          pouco disso). O aluguel inclui toda a estrutura: piscina com cascata, churrasqueira,
+          fogão a lenha, área gourmet completa e wi-fi. Ideal para encontros de família, momentos
+          de lazer e pré-eventos como chá de bebê e despedida de solteiro.
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
