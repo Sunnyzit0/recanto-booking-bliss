@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Moon, Sun } from "lucide-react";
 
 const CHAVE_ARMAZENAMENTO = "recanto-tema";
 
@@ -33,9 +34,9 @@ export function BotaoTema() {
       onClick={alternar}
       aria-label={escuro ? "Mudar para tema claro" : "Mudar para tema escuro"}
       title={escuro ? "Tema claro" : "Tema escuro"}
-      className="rounded-full p-2 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+      className="flex h-9 w-9 items-center justify-center rounded-full border border-border bg-secondary/60 text-foreground transition hover:bg-secondary"
     >
-      {escuro ? "☀️" : "🌙"}
+      {escuro ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
     </button>
   );
 }

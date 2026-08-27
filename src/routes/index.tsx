@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { MapPin, MessageCircle, Phone, Settings } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
 import {
@@ -137,48 +138,80 @@ function Home() {
   return (
     <main className="min-h-screen">
       {/* Topo */}
-      <header className="sticky top-0 z-10 border-b border-border bg-background/85 backdrop-blur">
+      <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
-          <img
-            src={logo}
-            alt="Logo Recanto da Piscina"
-            className="h-12 w-12 rounded-full object-cover"
-          />
-          <nav className="flex items-center gap-4 text-sm">
+          <div className="flex items-center gap-3">
+            <img
+              src={logo}
+              alt="Logo Recanto da Piscina"
+              className="h-11 w-11 rounded-full object-cover ring-2 ring-border"
+            />
+            <span className="font-display hidden text-lg text-foreground sm:inline">
+              {CONFIG.nome}
+            </span>
+          </div>
+          <nav className="flex items-center gap-5 text-sm">
             <a href="#reservar" className="text-muted-foreground transition hover:text-foreground">
               Reservar
             </a>
-            <Link to="/admin" className="text-muted-foreground transition hover:text-foreground">
-              Admin
-            </Link>
             <BotaoTema />
           </nav>
         </div>
       </header>
 
       {/* Hero */}
-      <section className="relative">
+      <section className="relative overflow-hidden">
         <img
           src={fotoPiscina}
           alt="Piscina do Recanto da Piscina em dia de sol"
-          className="h-[60vh] min-h-80 w-full object-cover"
+          className="h-[68vh] min-h-[26rem] w-full object-cover"
         />
-        <div className="absolute inset-0 flex items-center justify-center bg-primary/45 px-4">
+        <div className="absolute inset-0 bg-gradient-to-t from-primary/80 via-primary/40 to-primary/20" />
+        <div className="absolute inset-0 flex items-center justify-center px-4">
           <div className="max-w-2xl text-center text-primary-foreground">
-            <p className="text-sm tracking-[0.3em] uppercase opacity-90">{CONFIG.subtitulo}</p>
-            <h1 className="font-display mt-3 text-4xl leading-tight sm:text-6xl">{CONFIG.nome}</h1>
-            <p className="mt-4 text-base opacity-95 sm:text-lg">
-              Um refúgio cercado de verde em {CONFIG.cidade}, para reunir a família e celebrar
-              momentos com tranquilidade.
+            <span className="inline-flex items-center gap-2 rounded-full bg-background/15 px-4 py-1.5 text-xs tracking-[0.25em] uppercase backdrop-blur-sm">
+              <MapPin className="h-3.5 w-3.5" />
+              {CONFIG.cidade}
+            </span>
+            <h1 className="font-display mt-5 text-5xl leading-[1.05] sm:text-7xl">{CONFIG.nome}</h1>
+            <p className="font-display mt-2 text-lg tracking-[0.35em] uppercase opacity-90 sm:text-xl">
+              {CONFIG.subtitulo}
             </p>
-            <a
-              href="#reservar"
-              className="mt-7 inline-block rounded-full bg-background px-7 py-3 text-sm font-medium text-foreground transition hover:bg-secondary"
-            >
-              Ver datas disponíveis
-            </a>
+            <p className="mx-auto mt-5 max-w-md text-base opacity-95 sm:text-lg">
+              Um refúgio cercado de verde para reunir a família e celebrar momentos com
+              tranquilidade.
+            </p>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <a
+                href="#reservar"
+                className="shadow-soft inline-block rounded-full bg-background px-7 py-3 text-sm font-medium text-foreground transition hover:bg-secondary"
+              >
+                Ver datas disponíveis
+              </a>
+              <a
+                href={`https://wa.me/${CONFIG.whatsapp}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-primary-foreground/40 px-7 py-3 text-sm font-medium transition hover:bg-background/10"
+              >
+                <MessageCircle className="h-4 w-4" />
+                WhatsApp
+              </a>
+            </div>
           </div>
         </div>
+
+        {/* Onda decorativa fazendo a transição pra próxima seção */}
+        <svg
+          viewBox="0 0 1440 90"
+          preserveAspectRatio="none"
+          className="absolute bottom-0 left-0 h-14 w-full text-background sm:h-20"
+        >
+          <path
+            fill="currentColor"
+            d="M0,32 C240,80 480,0 720,24 C960,48 1200,88 1440,40 L1440,90 L0,90 Z"
+          />
+        </svg>
       </section>
 
       {/* Sobre */}
@@ -338,26 +371,65 @@ function Home() {
       {/* Contato */}
       <footer className="mx-auto max-w-5xl px-4 py-14">
         <h2 className="font-display text-3xl text-foreground">Onde estamos</h2>
-        <p className="mt-3 text-muted-foreground">{CONFIG.endereco}</p>
-        <p className="mt-1 text-muted-foreground">{CONFIG.cidade}</p>
-        <p className="mt-1 text-muted-foreground">Telefone: {CONFIG.telefone}</p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <a
-            href={`https://wa.me/${CONFIG.whatsapp}`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-block rounded-full bg-leaf px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+        <div className="mt-6 grid gap-6 sm:grid-cols-2">
+          <div>
+            <p className="flex items-center gap-2 text-muted-foreground">
+              <MapPin className="h-4 w-4 shrink-0" />
+              {CONFIG.endereco}, {CONFIG.cidade}
+            </p>
+            <p className="mt-2 flex items-center gap-2 text-muted-foreground">
+              <Phone className="h-4 w-4 shrink-0" />
+              {CONFIG.telefone}
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <a
+                href={`https://wa.me/${CONFIG.whatsapp}`}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full bg-leaf px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90"
+              >
+                <MessageCircle className="h-4 w-4" />
+                Falar no WhatsApp
+              </a>
+              <a
+                href={CONFIG.linkGoogleMaps}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-input px-6 py-3 text-sm font-medium text-foreground transition hover:bg-secondary"
+              >
+                <MapPin className="h-4 w-4" />
+                Abrir no Google Maps
+              </a>
+            </div>
+          </div>
+
+          <div className="shadow-soft relative aspect-square w-full overflow-hidden rounded-2xl border border-border sm:aspect-auto sm:h-56">
+            <iframe
+              title="Localização do Recanto da Piscina"
+              src={`https://maps.google.com/maps?q=${CONFIG.coordenadas.lat},${CONFIG.coordenadas.lng}&z=16&output=embed`}
+              className="h-full w-full grayscale-[15%]"
+              loading="lazy"
+              style={{ border: 0, pointerEvents: "none" }}
+            />
+            <a
+              href={CONFIG.linkGoogleMaps}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Abrir localização no Google Maps"
+              className="absolute inset-0"
+            />
+          </div>
+        </div>
+
+        <div className="mt-12 flex justify-center border-t border-border pt-6">
+          <Link
+            to="/admin"
+            aria-label="Área do administrador"
+            title="Área do administrador"
+            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground/50 transition hover:bg-secondary hover:text-muted-foreground"
           >
-            Falar no WhatsApp
-          </a>
-          <a
-            href={CONFIG.linkGoogleMaps}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-block rounded-full border border-input px-6 py-3 text-sm font-medium text-foreground transition hover:bg-secondary"
-          >
-            Ver no mapa
-          </a>
+            <Settings className="h-4 w-4" />
+          </Link>
         </div>
       </footer>
     </main>
