@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { MapPin, MessageCircle, Phone, Settings } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
@@ -101,16 +101,24 @@ function Home() {
   const [enviada, setEnviada] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
+  const enviandoRef = useRef(false);
+  const [erroConexao, setErroConexao] = useState(false);
 
   async function carregar() {
-    const [novasDatas, novasPendentes, novosBloqueios] = await Promise.all([
-      lerDatasOcupadas(),
-      lerDatasPendentes(),
-      lerBloqueios(),
-    ]);
-    setDatasOcupadas(novasDatas);
-    setDatasPendentes(novasPendentes);
-    setBloqueios(novosBloqueios);
+    try {
+      const [novasDatas, novasPendentes, novosBloqueios] = await Promise.all([
+        lerDatasOcupadas(),
+        lerDatasPendentes(),
+        lerBloqueios(),
+      ]);
+      setDatasOcupadas(novasDatas);
+      setDatasPendentes(novasPendentes);
+      setBloqueios(novosBloqueios);
+      setErroConexao(false);
+    } catch (erro) {
+      console.error("Falha ao carregar disponibilidade:", erro);
+      setErroConexao(true);
+    }
   }
 
   useEffect(() => {
@@ -141,6 +149,13 @@ function Home() {
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
+    // Trava síncrona: mesmo se o clique duplo acontecer antes da tela
+    // atualizar o botão pra "desabilitado", essa checagem já barra na hora.
+    if (enviandoRef.current) return;
+    if (erroConexao) {
+      setErroEnvio("Não conseguimos confirmar a disponibilidade agora. Recarregue a página e tente de novo.");
+      return;
+    }
     if (!nome.trim() || datasEscolhidas.length === 0) return;
     if (nome.trim().length < 3) {
       setErroEnvio("Digite seu nome completo.");
@@ -155,6 +170,7 @@ function Home() {
       setErroEnvio("Uma das datas escolhidas está fora do período permitido.");
       return;
     }
+    enviandoRef.current = true;
     setEnviando(true);
     setErroEnvio(null);
     try {
@@ -172,6 +188,7 @@ function Home() {
       console.error(erro);
       setErroEnvio("Não foi possível enviar sua solicitação. Tente novamente ou chame no WhatsApp.");
     } finally {
+      enviandoRef.current = false;
       setEnviando(false);
     }
   }
@@ -308,6 +325,13 @@ function Home() {
             de 1 a {MAX_DATAS} datas — para pacotes de 2 ou mais dias, o desconto é combinado
             diretamente com o dono do espaço.
           </p>
+
+          {erroConexao && (
+            <p className="mt-4 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              Não foi possível carregar as datas disponíveis agora. Verifique sua internet ou tente
+              recarregar a página em instantes.
+            </p>
+          )}
 
           <div className="mt-6 grid gap-6 lg:grid-cols-2">
             <Calendario
