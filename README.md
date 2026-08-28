@@ -1,68 +1,62 @@
-# Recanto Reserva Fácil
+# Recanto da Piscina — Site de Reservas
 
-Prompt para gerar o site — Recanto da Piscina
+Site de reservas para o Recanto da Piscina, espaço de eventos com piscina em Padre Bernardo, GO.
+Clientes escolhem datas no calendário e enviam uma solicitação; o dono aprova ou recusa pelo painel administrativo.
 
-Copie o texto abaixo e cole na ferramenta de IA (Lovable, v0, Bolt.new).
+## Stack
 
-Crie um site de reservas para o Recanto da Piscina, um espaço de eventos e lazer localizado em Padre Bernardo, GO (Setor Leste). Telefone de contato: (61) 99883-4734.
+- **Framework:** TanStack Start (React + Vite + Nitro)
+- **Banco de dados:** Supabase (PostgreSQL + Row Level Security)
+- **Hospedagem:** Vercel
+- **Estilo:** Tailwind CSS
 
-Sobre o local: Espaço para alugar por diária, com capacidade para cerca de 15 pessoas (pode passar um pouco disso). O aluguel inclui toda a estrutura: piscina (com cascata/chafariz decorativo), churrasqueira de alvenaria, área gourmet com cooktop, pia e bancada de mármore, mesa e banco rústicos de madeira, bastante espaço coberto para estacionar carros, e wi-fi. É um ambiente cercado de plantas e vegetação — ideal para reunir a família, curtir momentos de lazer, ou realizar pré-eventos como chá de bebê e despedida de solteiro, com conforto e tranquilidade.
+## Como funciona
 
-Estilo visual: vibe natureza — tons verdes e azuis (a logo do local já usa essas cores, com folhagem e uma onda), tipografia elegante, transmitindo calma e acolhimento. Vou fornecer a logo e fotos reais do espaço (piscina, churrasqueira, área gourmet, fachada) para usar no site — pode usar placeholders temporários nesses espaços, mas deixe a estrutura pronta para eu substituir facilmente pelas imagens reais.
+- **Página pública (`/`):** calendário mostrando datas Disponíveis / Em análise / Reservadas / Indisponíveis. O cliente escolhe de 1 a 3 datas e envia nome + telefone.
+- **Painel admin (`/admin`):** login por senha (verificada no servidor), lista de solicitações, aprovar/recusar (em lote quando é um pedido de várias datas), editar valor/data/horário, bloquear datas manualmente.
+- Toda ação sensível (ler reservas com nome/telefone, aprovar, editar, bloquear) passa por **funções de servidor** (`src/lib/admin-actions.ts`) usando a chave `service_role` do Supabase — a chave pública do site nunca tem esse acesso.
 
-Estrutura do site — DUAS ÁREAS:
+## Rodando localmente
 
-Área do Cliente (pública):
-
-Página inicial com fotos do espaço, descrição, diferenciais e localização
-
-Calendário mostrando as datas disponíveis para reserva (datas já ocupadas aparecem bloqueadas)
-
-Formulário de solicitação de reserva: nome, telefone, data desejada
-
-Informação de valor de referência: R$200 por diária (das 8h às 22h) — deixar fácil de editar depois, pois o valor pode variar
-
-Informações de pagamento (Pix ou dinheiro) e política de cancelamento (até 24h de antecedência)
-
-Área do Administrador (privada, com login):
-
-Login separado, acessível só pelo dono
-
-Lista de todas as solicitações de reserva recebidas (nome do cliente, telefone, data solicitada, status)
-
-Permite aprovar ou recusar uma reserva
-
-Permite editar valor e horário de cada reserva
-
-Permite bloquear ou liberar datas no calendário de disponibilidade
-
-Requisitos técnicos:
-
-Manter a estrutura do código simples e organizada (poucos componentes, lógica direta, sem bibliotecas extras desnecessárias) — o site vai ser editado manualmente depois por alguém com conhecimento básico de programação
-
-Design responsivo (funcionar bem em celular, já que a maioria dos clientes vai acessar pelo celular)
-
-Pode usar dados de exemplo (mock) por enquanto nas reservas, sem precisar integrar banco de dados ainda
-
-Depois de gerar: exporte o código ou compartilhe o link do projeto para revisão e ajustes finais (integração com banco de dados real, autenticação da área admin, etc.).
-
-This project was built with [Lovable](https://lovable.dev).
-
-## Build with Lovable
-
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/5bab8801-1c81-4aa9-a8fe-0f5ac39abd0d).
-
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
-
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
-
-```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
+```bash
+npm install
+cp .env.example .env   # preencha com suas chaves (veja abaixo)
 npm run dev
 ```
+
+## Variáveis de ambiente
+
+| Variável | Onde usar | Descrição |
+|---|---|---|
+| `VITE_SUPABASE_URL` | Cliente e servidor | URL do projeto Supabase |
+| `VITE_SUPABASE_ANON_KEY` | Cliente | Chave pública (anon) do Supabase |
+| `ADMIN_PASSWORD` | Só servidor | Senha de acesso ao `/admin` |
+| `SESSION_SECRET` | Só servidor | String aleatória (32+ caracteres) usada pra assinar o cookie de sessão |
+| `SUPABASE_SERVICE_ROLE_KEY` | Só servidor | Chave secreta do Supabase — nunca deve ter prefixo `VITE_` nem ser exposta ao navegador |
+
+As três últimas variáveis são configuradas direto no painel da Vercel (Settings → Environment Variables), nunca commitadas no Git.
+
+## Banco de dados (Supabase)
+
+Os scripts SQL usados para configurar tabelas, permissões (RLS) e funções ficam na raiz do
+projeto (arquivos `supabase-*.sql`), executados manualmente pelo SQL Editor do Supabase — não são
+rodados automaticamente no deploy. Ao clonar o projeto num novo Supabase, rode todos esses arquivos
+na ordem em que foram criados.
+
+Principais peças:
+- Tabelas `reservas` e `bloqueios`
+- Função `datas_ocupadas()` / `datas_pendentes()` — expõem só as datas (sem nome/telefone) pro calendário público
+- Trigger que impede reservar fora da janela de 6 meses
+- Trigger que impede mais de 3 datas por pedido
+- Índice único que impede duas reservas APROVADAS na mesma data
+
+## Deploy
+
+Push na branch `main` do GitHub → a Vercel publica automaticamente. Um workflow do GitHub Actions
+(`.github/workflows/manter-supabase-ativo.yml`) faz um ping no banco 2x por semana pra evitar que o
+projeto gratuito do Supabase pause por inatividade.
+
+## Domínio
+
+Hoje publicado em `recantodapiscina.vercel.app`. Ao configurar um domínio próprio, atualizar a
+constante `URL_BASE` em `src/routes/index.tsx` (usada nas tags de SEO/compartilhamento).

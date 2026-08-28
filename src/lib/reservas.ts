@@ -10,7 +10,7 @@ export const CONFIG = {
   whatsapp: "5561998834734",
   cidade: "Padre Bernardo - GO, Setor Leste",
   endereco: "Rua 41, Lote 03, Setor Leste",
-  coordenadas: { lat: -15.175366963195764, lng: -48.26786184659529 },
+  coordenadas: { lat: -15.175286159058848, lng: -48.26782278485659 },
   linkGoogleMaps:
     "https://www.google.com/maps/search/?api=1&query=" +
     encodeURIComponent("Rua 41, Lote 03, Setor Leste, Padre Bernardo, GO"),
@@ -39,6 +39,17 @@ export type Reserva = {
   status: Status;
   grupo_id?: string | null;
 };
+
+export function formatarTelefone(valor: string): string {
+  const digitos = valor.replace(/\D/g, "").slice(0, 11);
+  if (digitos.length <= 2) return digitos.replace(/^(\d{0,2})/, "($1");
+  if (digitos.length <= 7) return digitos.replace(/^(\d{2})(\d{0,5})/, "($1) $2");
+  return digitos.replace(/^(\d{2})(\d{5})(\d{0,4})/, "($1) $2-$3");
+}
+
+export function telefoneValido(valor: string): boolean {
+  return /^\(\d{2}\) \d{4,5}-\d{4}$/.test(valor);
+}
 
 export function toISO(d: Date) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(

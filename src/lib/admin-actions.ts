@@ -1,7 +1,8 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createCsrfMiddleware } from "@tanstack/react-start";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { z } from "zod";
 
 // ---------------------------------------------------------------------------
 // Tudo neste arquivo roda SÓ no servidor — nunca é enviado ao navegador.
@@ -15,6 +16,11 @@ const COOKIE_TENTATIVAS = "recanto_admin_tentativas";
 const DURACAO_SEGUNDOS = 60 * 60 * 24 * 30; // fica logado por 30 dias
 const MAX_TENTATIVAS = 3;
 const BLOQUEIO_MINUTOS = 30;
+
+// Confere que a requisição realmente veio do próprio site (mesma origem),
+// bloqueando tentativas de outro site forçar uma ação no seu navegador
+// (CSRF) usando sua sessão sem você saber.
+const protegerContraCsrf = createCsrfMiddleware();
 
 function segredoSessao() {
   const s = process.env.SESSION_SECRET;
@@ -99,10 +105,49 @@ function supabaseAdmin() {
   return createClient(url, chaveSecreta, { auth: { persistSession: false } });
 }
 
+/**
+ * Traduz o erro de "duas reservas aprovadas na mesma data" (bloqueado
+ * por uma trava no próprio banco) numa mensagem que faz sentido pro
+ * admin entender, em vez de um erro técnico do Postgres.
+ */
+function traduzirErroBanco(error: { code?: string; message: string }): never {
+  if (error.code === "23505") {
+    throw new Error(
+      "Já existe uma reserva aprovada para uma dessas datas. Recuse ou mude a data antes de aprovar.",
+    );
+  }
+  throw new Error(error.message);
+}
+
+// --- Esquemas de validação (Zod) ---
+// Restringe exatamente o que cada ação pode alterar — mesmo que alguém
+// tente mandar campos extras direto pela API, o servidor rejeita.
+
+const DataISO = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Data inválida");
+
+const MudancaReservaSchema = z
+  .object({
+    data: DataISO.optional(),
+    valor: z.number().positive().max(100000).optional(),
+    horario: z.string().min(1).max(100).optional(),
+    status: z.enum(["pendente", "aprovada", "recusada"]).optional(),
+  })
+  .strict()
+  .refine((obj) => Object.keys(obj).length > 0, { message: "Nada para atualizar" });
+
+const LoginSchema = z.object({ senha: z.string().min(1).max(200) });
+const AtualizarReservaSchema = z.object({ id: z.string().uuid(), mudanca: MudancaReservaSchema });
+const AtualizarVariasSchema = z.object({
+  ids: z.array(z.string().uuid()).min(1).max(3),
+  mudanca: MudancaReservaSchema,
+});
+const AlternarBloqueioSchema = z.object({ data: DataISO, jaBloqueada: z.boolean() });
+
 // --- Login / sessão ---
 
 export const loginAdmin = createServerFn({ method: "POST" })
-  .validator((d: { senha: string }) => d)
+  .middleware([protegerContraCsrf])
+  .validator(LoginSchema)
   .handler(async ({ data }) => {
     const senhaCorreta = process.env.ADMIN_PASSWORD;
     if (!senhaCorreta) throw new Error("ADMIN_PASSWORD não configurada no servidor.");
@@ -145,10 +190,12 @@ export const verificarSessaoAdmin = createServerFn({ method: "GET" }).handler(as
   return { logado: tokenValido(getCookie(COOKIE)) };
 });
 
-export const sairAdmin = createServerFn({ method: "POST" }).handler(async () => {
-  deleteCookie(COOKIE, { path: "/" });
-  return { ok: true };
-});
+export const sairAdmin = createServerFn({ method: "POST" })
+  .middleware([protegerContraCsrf])
+  .handler(async () => {
+    deleteCookie(COOKIE, { path: "/" });
+    return { ok: true };
+  });
 
 // --- Dados do admin (exigem sessão válida) ---
 
@@ -170,11 +217,12 @@ export const listarBloqueiosAdmin = createServerFn({ method: "GET" }).handler(as
 });
 
 export const atualizarReservaAdmin = createServerFn({ method: "POST" })
-  .validator((d: { id: string; mudanca: Record<string, unknown> }) => d)
+  .middleware([protegerContraCsrf])
+  .validator(AtualizarReservaSchema)
   .handler(async ({ data }) => {
     exigirSessaoValida();
     const { error } = await supabaseAdmin().from("reservas").update(data.mudanca).eq("id", data.id);
-    if (error) throw new Error(error.message);
+    if (error) traduzirErroBanco(error);
     return { ok: true };
   });
 
@@ -184,16 +232,18 @@ export const atualizarReservaAdmin = createServerFn({ method: "POST" })
  * datas do grupo junto).
  */
 export const atualizarVariasReservasAdmin = createServerFn({ method: "POST" })
-  .validator((d: { ids: string[]; mudanca: Record<string, unknown> }) => d)
+  .middleware([protegerContraCsrf])
+  .validator(AtualizarVariasSchema)
   .handler(async ({ data }) => {
     exigirSessaoValida();
     const { error } = await supabaseAdmin().from("reservas").update(data.mudanca).in("id", data.ids);
-    if (error) throw new Error(error.message);
+    if (error) traduzirErroBanco(error);
     return { ok: true };
   });
 
 export const alternarBloqueioAdmin = createServerFn({ method: "POST" })
-  .validator((d: { data: string; jaBloqueada: boolean }) => d)
+  .middleware([protegerContraCsrf])
+  .validator(AlternarBloqueioSchema)
   .handler(async ({ data }) => {
     exigirSessaoValida();
     const client = supabaseAdmin();

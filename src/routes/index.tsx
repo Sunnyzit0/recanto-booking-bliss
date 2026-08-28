@@ -9,11 +9,16 @@ import {
   criarSolicitacao,
   escutarBloqueios,
   formatarData,
+  formatarTelefone,
   janelaDeReserva,
   lerBloqueios,
   lerDatasOcupadas,
   lerDatasPendentes,
+  telefoneValido,
 } from "@/lib/reservas";
+
+// Ajuste aqui quando comprar o domínio próprio (ex: https://recantodapiscina.com.br)
+const URL_BASE = "https://recantodapiscina.vercel.app";
 
 import logo from "@/assets/logo.png";
 import fotoPiscina from "@/assets/piscina-dia.jpg";
@@ -28,17 +33,45 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Alugue por diária o Recanto da Piscina: piscina com cascata, churrasqueira, área gourmet e wi-fi. Consulte datas disponíveis e solicite sua reserva.",
+          "Alugue por diária o Recanto da Piscina: piscina com cascata, churrasqueira, fogão a lenha, área gourmet e wi-fi. Consulte datas disponíveis e solicite sua reserva.",
       },
       { property: "og:title", content: "Recanto da Piscina — Reserve sua diária" },
       {
         property: "og:description",
-        content: "Piscina, churrasqueira e área gourmet em Padre Bernardo, GO. Reserve online.",
+        content: "Piscina, churrasqueira, fogão a lenha e área gourmet em Padre Bernardo, GO. Reserve online.",
       },
+      { property: "og:type", content: "website" },
+      { property: "og:locale", content: "pt_BR" },
+      { property: "og:url", content: URL_BASE },
+      { property: "og:image", content: `${URL_BASE}${fotoPiscina}` },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
+    links: [{ rel: "canonical", href: URL_BASE }],
   }),
   component: Home,
 });
+
+const SCHEMA_ORG = {
+  "@context": "https://schema.org",
+  "@type": "EventVenue",
+  name: CONFIG.nome,
+  description: "Espaço de eventos com piscina para alugar por diária em Padre Bernardo, GO.",
+  address: {
+    "@type": "PostalAddress",
+    streetAddress: CONFIG.endereco,
+    addressLocality: "Padre Bernardo",
+    addressRegion: "GO",
+    addressCountry: "BR",
+  },
+  telephone: CONFIG.telefone,
+  geo: {
+    "@type": "GeoCoordinates",
+    latitude: CONFIG.coordenadas.lat,
+    longitude: CONFIG.coordenadas.lng,
+  },
+  image: `${URL_BASE}${fotoPiscina}`,
+  url: URL_BASE,
+};
 
 const DIFERENCIAIS = [
   { titulo: "Piscina com cascata", texto: "Piscina ampla com chafariz decorativo e iluminação à noite." },
@@ -108,7 +141,15 @@ function Home() {
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
-    if (!nome || !telefone || datasEscolhidas.length === 0) return;
+    if (!nome.trim() || datasEscolhidas.length === 0) return;
+    if (nome.trim().length < 3) {
+      setErroEnvio("Digite seu nome completo.");
+      return;
+    }
+    if (!telefoneValido(telefone)) {
+      setErroEnvio("Telefone inválido. Use o formato (61) 90000-0000.");
+      return;
+    }
     const foraDaJanela = datasEscolhidas.some((d) => d < janela.min || d > janela.max);
     if (foraDaJanela) {
       setErroEnvio("Uma das datas escolhidas está fora do período permitido.");
@@ -137,6 +178,11 @@ function Home() {
 
   return (
     <main className="min-h-screen">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(SCHEMA_ORG) }}
+      />
+
       {/* Topo */}
       <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
@@ -184,7 +230,7 @@ function Home() {
             <div className="mt-8 flex flex-wrap justify-center gap-3">
               <a
                 href="#reservar"
-                className="shadow-soft inline-block rounded-full bg-white px-7 py-3 text-sm font-medium text-foreground transition hover:bg-white/90"
+                className="shadow-soft inline-block rounded-full bg-white px-7 py-3 text-sm font-medium text-[#0C4137] transition hover:bg-white/90"
               >
                 Ver datas disponíveis
               </a>
@@ -294,9 +340,11 @@ function Home() {
                 Telefone / WhatsApp
                 <input
                   value={telefone}
-                  onChange={(e) => setTelefone(e.target.value)}
+                  onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
                   required
+                  inputMode="numeric"
                   placeholder="(61) 90000-0000"
+                  maxLength={15}
                   className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground outline-none focus:border-ring"
                 />
               </label>
