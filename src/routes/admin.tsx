@@ -9,7 +9,9 @@ import {
   listarBloqueiosAdmin,
   listarReservasAdmin,
   loginAdmin,
+  obterEmailAdmin,
   sairAdmin,
+  salvarEmailAdmin,
   verificarSessaoAdmin,
 } from "@/lib/admin-actions";
 import { formatarData, type Reserva, type Status } from "@/lib/reservas";
@@ -43,6 +45,10 @@ function Admin() {
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [bloqueios, setBloqueios] = useState<string[]>([]);
   const [carregando, setCarregando] = useState(true);
+
+  const [emailAdmin, setEmailAdmin] = useState("");
+  const [salvandoEmail, setSalvandoEmail] = useState(false);
+  const [emailSalvo, setEmailSalvo] = useState(false);
 
   // Verifica se já existe uma sessão válida (cookie assinado no servidor)
   useEffect(() => {
@@ -91,11 +97,24 @@ function Admin() {
   useEffect(() => {
     if (!logado) return;
     carregar();
+    obterEmailAdmin().then((r) => setEmailAdmin(r.email));
     // Sem login "realtime" do banco aqui — atualiza a cada 20s, e também
     // logo depois de qualquer ação (aprovar, recusar, editar, bloquear).
     const intervalo = setInterval(carregar, 20_000);
     return () => clearInterval(intervalo);
   }, [logado]);
+
+  async function salvarEmail(e: React.FormEvent) {
+    e.preventDefault();
+    setSalvandoEmail(true);
+    setEmailSalvo(false);
+    try {
+      await salvarEmailAdmin({ data: { email: emailAdmin } });
+      setEmailSalvo(true);
+    } finally {
+      setSalvandoEmail(false);
+    }
+  }
 
   async function atualizar(id: string, mudanca: Partial<Reserva>) {
     setReservas((atual) => atual.map((r) => (r.id === id ? { ...r, ...mudanca } : r)));
@@ -179,6 +198,35 @@ function Admin() {
           <BotaoTema />
         </div>
       </div>
+
+      <section className="mt-8 rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-display text-xl text-foreground">Aviso por e-mail</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Toda vez que chegar uma reserva nova, mandamos um e-mail pra esse endereço com um resumo
+          e botões pra aprovar ou recusar direto, sem precisar entrar aqui no painel.
+        </p>
+        <form onSubmit={salvarEmail} className="mt-4 flex flex-wrap gap-3">
+          <input
+            type="email"
+            value={emailAdmin}
+            onChange={(e) => {
+              setEmailAdmin(e.target.value);
+              setEmailSalvo(false);
+            }}
+            placeholder="seuemail@exemplo.com"
+            required
+            className="min-w-64 flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus:border-ring"
+          />
+          <button
+            type="submit"
+            disabled={salvandoEmail}
+            className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+          >
+            {salvandoEmail ? "Salvando..." : "Salvar"}
+          </button>
+        </form>
+        {emailSalvo && <p className="mt-2 text-sm text-leaf">E-mail salvo com sucesso.</p>}
+      </section>
 
       <section className="mt-8">
         <h2 className="font-display text-2xl text-foreground">Solicitações</h2>

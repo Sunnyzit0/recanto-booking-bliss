@@ -3,10 +3,10 @@ import { useEffect, useRef, useState } from "react";
 import { MapPin, MessageCircle, Phone, Settings } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
+import { criarSolicitacaoServidor } from "@/lib/email-actions";
 import {
   CONFIG,
   calcularValorDiaria,
-  criarSolicitacao,
   escutarBloqueios,
   formatarData,
   formatarTelefone,
@@ -98,6 +98,7 @@ function Home() {
   const [datasEscolhidas, setDatasEscolhidas] = useState<string[]>([]);
   const [nome, setNome] = useState("");
   const [telefone, setTelefone] = useState("");
+  const [email, setEmail] = useState("");
   const [enviada, setEnviada] = useState(false);
   const [enviando, setEnviando] = useState(false);
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
@@ -174,15 +175,19 @@ function Home() {
     setEnviando(true);
     setErroEnvio(null);
     try {
-      await criarSolicitacao({
-        nome,
-        telefone,
-        datas: datasEscolhidas,
-        horario: CONFIG.horario,
+      await criarSolicitacaoServidor({
+        data: {
+          nome,
+          telefone,
+          email: email || undefined,
+          datas: datasEscolhidas,
+          horario: CONFIG.horario,
+        },
       });
       setEnviada(true);
       setNome("");
       setTelefone("");
+      setEmail("");
       setDatasEscolhidas([]);
     } catch (erro) {
       console.error(erro);
@@ -369,6 +374,17 @@ function Home() {
                   inputMode="numeric"
                   placeholder="(61) 90000-0000"
                   maxLength={15}
+                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground outline-none focus:border-ring"
+                />
+              </label>
+
+              <label className="text-sm text-muted-foreground">
+                E-mail (opcional)
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="seuemail@exemplo.com"
                   className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground outline-none focus:border-ring"
                 />
               </label>

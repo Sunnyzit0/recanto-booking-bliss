@@ -60,10 +60,11 @@ export function Calendario({
   }
 
   const ESTILOS: Record<Estado, string> = {
-    disponivel: "bg-secondary text-secondary-foreground hover:bg-accent",
-    pendente: "bg-accent/60 text-accent-foreground",
-    reservada: "bg-destructive/10 text-destructive line-through",
-    indisponivel: "bg-muted text-muted-foreground/60 line-through",
+    disponivel:
+      "bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900/70",
+    pendente: "bg-orange-300 text-orange-950 dark:bg-orange-600/70 dark:text-orange-50",
+    reservada: "bg-red-300 text-red-950 line-through dark:bg-red-700/70 dark:text-red-50",
+    indisponivel: "bg-yellow-300 text-yellow-950 line-through dark:bg-yellow-600/70 dark:text-yellow-50",
   };
 
   const TITULOS: Record<Estado, string | undefined> = {
@@ -145,16 +146,16 @@ export function Calendario({
 
       <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-secondary" /> Disponível
+          <span className="h-3 w-3 rounded bg-green-200 dark:bg-green-800" /> Disponível
         </span>
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-accent/60" /> Em análise
+          <span className="h-3 w-3 rounded bg-orange-300 dark:bg-orange-600" /> Em análise
         </span>
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-destructive/20" /> Reservada
+          <span className="h-3 w-3 rounded bg-red-300 dark:bg-red-700" /> Reservada
         </span>
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-muted" /> Indisponível
+          <span className="h-3 w-3 rounded bg-yellow-300 dark:bg-yellow-600" /> Indisponível
         </span>
       </div>
     </div>

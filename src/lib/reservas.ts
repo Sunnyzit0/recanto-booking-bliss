@@ -15,6 +15,8 @@ export const CONFIG = {
     "https://www.google.com/maps/search/?api=1&query=" +
     encodeURIComponent("Rua 41, Lote 03, Setor Leste, Padre Bernardo, GO"),
   capacidade: "até 40 pessoas",
+  // Ajuste aqui quando comprar o domínio próprio (ex: https://recantodapiscina.com.br)
+  urlBase: "https://recantodapiscina.vercel.app",
   horario: "das 8h às 20h (12 horas)",
   pagamento: "Pix ou dinheiro",
   cancelamento: "Cancelamento gratuito até 7 dias antes da data reservada.",
@@ -33,6 +35,7 @@ export type Reserva = {
   id: string;
   nome: string;
   telefone: string;
+  email?: string | null;
   data: string; // AAAA-MM-DD
   valor: number;
   horario: string;
@@ -67,35 +70,10 @@ export function formatarData(iso: string) {
 export type SolicitacaoInput = {
   nome: string;
   telefone: string;
+  email?: string;
   datas: string[]; // 1 a 3 datas (AAAA-MM-DD)
   horario: string;
 };
-
-/**
- * Cria uma solicitação de reserva — o cliente pode escolher de 1 a 3
- * datas de uma vez. Todas as datas ficam ligadas por um "grupo_id",
- * pra aparecerem juntas no painel do admin e serem aprovadas/recusadas
- * em conjunto. O valor de cada dia é calculado individualmente (útil
- * quando o pedido cruza a data do reajuste de preço); o desconto por
- * pacote é combinado diretamente entre o dono e o cliente.
- */
-export async function criarSolicitacao({ nome, telefone, datas, horario }: SolicitacaoInput) {
-  if (datas.length < 1 || datas.length > 3) {
-    throw new Error("Escolha de 1 a 3 datas.");
-  }
-  const grupoId = crypto.randomUUID();
-  const linhas = datas.map((data) => ({
-    nome,
-    telefone,
-    data,
-    valor: calcularValorDiaria(data),
-    horario,
-    status: "pendente" as const,
-    grupo_id: grupoId,
-  }));
-  const { error } = await supabase.from("reservas").insert(linhas);
-  if (error) throw new Error(error.message);
-}
 
 /**
  * Retorna só as datas já ocupadas (reservas aprovadas), sem nome/telefone

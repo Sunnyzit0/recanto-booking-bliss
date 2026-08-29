@@ -20,9 +20,9 @@ const BLOQUEIO_MINUTOS = 30;
 // Confere que a requisição realmente veio do próprio site (mesma origem),
 // bloqueando tentativas de outro site forçar uma ação no seu navegador
 // (CSRF) usando sua sessão sem você saber.
-const protegerContraCsrf = createCsrfMiddleware();
+export const protegerContraCsrf = createCsrfMiddleware();
 
-function segredoSessao() {
+export function segredoSessao() {
   const s = process.env.SESSION_SECRET;
   if (!s || s.length < 32) {
     throw new Error(
@@ -94,7 +94,7 @@ function limparTentativas() {
 }
 
 /** Cliente do Supabase com acesso total (só usado aqui, no servidor) */
-function supabaseAdmin() {
+export function supabaseAdmin() {
   const url = process.env.VITE_SUPABASE_URL;
   const chaveSecreta = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !chaveSecreta) {
@@ -110,7 +110,7 @@ function supabaseAdmin() {
  * por uma trava no próprio banco) numa mensagem que faz sentido pro
  * admin entender, em vez de um erro técnico do Postgres.
  */
-function traduzirErroBanco(error: { code?: string; message: string }): never {
+export function traduzirErroBanco(error: { code?: string; message: string }): never {
   if (error.code === "23505") {
     throw new Error(
       "Já existe uma reserva aprovada para uma dessas datas. Recuse ou mude a data antes de aprovar.",
@@ -254,5 +254,30 @@ export const alternarBloqueioAdmin = createServerFn({ method: "POST" })
       const { error } = await client.from("bloqueios").insert({ data: data.data });
       if (error) throw new Error(error.message);
     }
+    return { ok: true };
+  });
+
+// --- Configuração do e-mail que recebe avisos de reserva nova ---
+
+export const obterEmailAdmin = createServerFn({ method: "GET" }).handler(async () => {
+  exigirSessaoValida();
+  const { data, error } = await supabaseAdmin()
+    .from("configuracoes")
+    .select("valor")
+    .eq("chave", "email_admin")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return { email: data?.valor ?? "" };
+});
+
+export const salvarEmailAdmin = createServerFn({ method: "POST" })
+  .middleware([protegerContraCsrf])
+  .validator(z.object({ email: z.string().email().max(200) }))
+  .handler(async ({ data }) => {
+    exigirSessaoValida();
+    const { error } = await supabaseAdmin()
+      .from("configuracoes")
+      .upsert({ chave: "email_admin", valor: data.email });
+    if (error) throw new Error(error.message);
     return { ok: true };
   });
