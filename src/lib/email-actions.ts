@@ -1,4 +1,4 @@
-import { createServerFn, createCsrfMiddleware } from "@tanstack/react-start";
+import { createServerFn } from "@tanstack/react-start";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { Resend } from "resend";
@@ -8,7 +8,6 @@ import { CONFIG, calcularValorDiaria, formatarData } from "@/lib/reservas";
 // Instância própria (não compartilhada com admin-actions.ts) — evita um
 // bug de separação cliente/servidor quando a mesma instância é usada
 // em mais de um arquivo.
-const protegerContraCsrf = createCsrfMiddleware();
 
 // ---------------------------------------------------------------------------
 // Roda só no servidor. Cuida de: (1) gravar a solicitação de reserva com
@@ -68,7 +67,6 @@ const CriarSolicitacaoSchema = z.object({
 });
 
 export const criarSolicitacaoServidor = createServerFn({ method: "POST" })
-  .middleware([protegerContraCsrf])
   .validator(CriarSolicitacaoSchema)
   .handler(async ({ data }) => {
     const client = supabaseAdmin();
@@ -171,7 +169,6 @@ export const lerConfirmacaoPorToken = createServerFn({ method: "GET" })
   });
 
 export const executarConfirmacaoPorToken = createServerFn({ method: "POST" })
-  .middleware([protegerContraCsrf])
   .validator(z.object({ token: z.string().min(10) }))
   .handler(async ({ data }) => {
     const payload = lerToken(data.token);

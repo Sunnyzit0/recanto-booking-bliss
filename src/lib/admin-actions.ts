@@ -1,4 +1,4 @@
-import { createServerFn, createCsrfMiddleware } from "@tanstack/react-start";
+import { createServerFn } from "@tanstack/react-start";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHmac, timingSafeEqual } from "node:crypto";
@@ -20,7 +20,6 @@ const BLOQUEIO_MINUTOS = 30;
 // Confere que a requisição realmente veio do próprio site (mesma origem),
 // bloqueando tentativas de outro site forçar uma ação no seu navegador
 // (CSRF) usando sua sessão sem você saber.
-const protegerContraCsrf = createCsrfMiddleware();
 
 export function segredoSessao() {
   const s = process.env.SESSION_SECRET;
@@ -146,7 +145,6 @@ const AlternarBloqueioSchema = z.object({ data: DataISO, jaBloqueada: z.boolean(
 // --- Login / sessão ---
 
 export const loginAdmin = createServerFn({ method: "POST" })
-  .middleware([protegerContraCsrf])
   .validator(LoginSchema)
   .handler(async ({ data }) => {
     const senhaCorreta = process.env.ADMIN_PASSWORD;
@@ -191,7 +189,6 @@ export const verificarSessaoAdmin = createServerFn({ method: "GET" }).handler(as
 });
 
 export const sairAdmin = createServerFn({ method: "POST" })
-  .middleware([protegerContraCsrf])
   .handler(async () => {
     deleteCookie(COOKIE, { path: "/" });
     return { ok: true };
@@ -217,7 +214,6 @@ export const listarBloqueiosAdmin = createServerFn({ method: "GET" }).handler(as
 });
 
 export const atualizarReservaAdmin = createServerFn({ method: "POST" })
-  .middleware([protegerContraCsrf])
   .validator(AtualizarReservaSchema)
   .handler(async ({ data }) => {
     exigirSessaoValida();
@@ -232,7 +228,6 @@ export const atualizarReservaAdmin = createServerFn({ method: "POST" })
  * datas do grupo junto).
  */
 export const atualizarVariasReservasAdmin = createServerFn({ method: "POST" })
-  .middleware([protegerContraCsrf])
   .validator(AtualizarVariasSchema)
   .handler(async ({ data }) => {
     exigirSessaoValida();
@@ -242,7 +237,6 @@ export const atualizarVariasReservasAdmin = createServerFn({ method: "POST" })
   });
 
 export const alternarBloqueioAdmin = createServerFn({ method: "POST" })
-  .middleware([protegerContraCsrf])
   .validator(AlternarBloqueioSchema)
   .handler(async ({ data }) => {
     exigirSessaoValida();
@@ -271,7 +265,6 @@ export const obterEmailAdmin = createServerFn({ method: "GET" }).handler(async (
 });
 
 export const salvarEmailAdmin = createServerFn({ method: "POST" })
-  .middleware([protegerContraCsrf])
   .validator(z.object({ email: z.string().email().max(200) }))
   .handler(async ({ data }) => {
     exigirSessaoValida();
