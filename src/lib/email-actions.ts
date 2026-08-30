@@ -1,14 +1,14 @@
-import { createServerFn } from "@tanstack/react-start";
+import { createServerFn, createCsrfMiddleware } from "@tanstack/react-start";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { Resend } from "resend";
-import {
-  protegerContraCsrf,
-  segredoSessao,
-  supabaseAdmin,
-  traduzirErroBanco,
-} from "@/lib/admin-actions";
+import { segredoSessao, supabaseAdmin, traduzirErroBanco } from "@/lib/admin-actions";
 import { CONFIG, calcularValorDiaria, formatarData } from "@/lib/reservas";
+
+// Instância própria (não compartilhada com admin-actions.ts) — evita um
+// bug de separação cliente/servidor quando a mesma instância é usada
+// em mais de um arquivo.
+const protegerContraCsrf = createCsrfMiddleware();
 
 // ---------------------------------------------------------------------------
 // Roda só no servidor. Cuida de: (1) gravar a solicitação de reserva com

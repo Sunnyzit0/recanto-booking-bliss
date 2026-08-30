@@ -20,7 +20,7 @@ const BLOQUEIO_MINUTOS = 30;
 // Confere que a requisição realmente veio do próprio site (mesma origem),
 // bloqueando tentativas de outro site forçar uma ação no seu navegador
 // (CSRF) usando sua sessão sem você saber.
-export const protegerContraCsrf = createCsrfMiddleware();
+const protegerContraCsrf = createCsrfMiddleware();
 
 export function segredoSessao() {
   const s = process.env.SESSION_SECRET;
