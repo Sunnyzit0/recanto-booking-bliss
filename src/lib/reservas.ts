@@ -16,7 +16,7 @@ export const CONFIG = {
     encodeURIComponent("Rua 41, Lote 03, Setor Leste, Padre Bernardo, GO"),
   capacidade: "até 40 pessoas",
   // Ajuste aqui quando comprar o domínio próprio (ex: https://recantodapiscina.com.br)
-  urlBase: "https://recantodapiscina.vercel.app",
+  urlBase: "https://www.recantodapiscina.com.br",
   horario: "das 8h às 20h (12 horas)",
   pagamento: "Pix ou dinheiro",
   cancelamento: "Cancelamento gratuito até 7 dias antes da data reservada.",

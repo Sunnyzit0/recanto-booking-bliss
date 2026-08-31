@@ -18,7 +18,7 @@ import {
 } from "@/lib/reservas";
 
 // Ajuste aqui quando comprar o domínio próprio (ex: https://recantodapiscina.com.br)
-const URL_BASE = "https://recantodapiscina.vercel.app";
+const URL_BASE = "https://www.recantodapiscina.com.br";
 
 import logo from "@/assets/logo.png";
 import fotoPiscina from "@/assets/piscina-dia.jpg";
