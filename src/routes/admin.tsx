@@ -6,10 +6,13 @@ import {
   alternarBloqueioAdmin,
   atualizarReservaAdmin,
   atualizarVariasReservasAdmin,
+  definirStatusReservas,
+  excluirReservasAdmin,
   listarBloqueiosAdmin,
   listarReservasAdmin,
   loginAdmin,
   obterEmailAdmin,
+  obterStatusReservas,
   sairAdmin,
   salvarEmailAdmin,
   verificarSessaoAdmin,
@@ -49,6 +52,10 @@ function Admin() {
   const [emailAdmin, setEmailAdmin] = useState("");
   const [salvandoEmail, setSalvandoEmail] = useState(false);
   const [emailSalvo, setEmailSalvo] = useState(false);
+
+  const [reservasAbertas, setReservasAbertas] = useState(true);
+  const [alterandoStatus, setAlterandoStatus] = useState(false);
+  const [excluindoIds, setExcluindoIds] = useState<string[]>([]);
 
   // Verifica se já existe uma sessão válida (cookie assinado no servidor)
   useEffect(() => {
@@ -98,11 +105,36 @@ function Admin() {
     if (!logado) return;
     carregar();
     obterEmailAdmin().then((r) => setEmailAdmin(r.email));
+    obterStatusReservas().then((r) => setReservasAbertas(r.abertas));
     // Sem login "realtime" do banco aqui — atualiza a cada 20s, e também
     // logo depois de qualquer ação (aprovar, recusar, editar, bloquear).
     const intervalo = setInterval(carregar, 20_000);
     return () => clearInterval(intervalo);
   }, [logado]);
+
+  async function alternarStatusReservas() {
+    setAlterandoStatus(true);
+    const novoValor = !reservasAbertas;
+    try {
+      await definirStatusReservas({ data: { abertas: novoValor } });
+      setReservasAbertas(novoValor);
+    } finally {
+      setAlterandoStatus(false);
+    }
+  }
+
+  async function excluirGrupo(ids: string[]) {
+    if (!confirm(`Excluir ${ids.length > 1 ? "essas " + ids.length + " datas" : "essa reserva"}? Essa ação não pode ser desfeita.`)) {
+      return;
+    }
+    setExcluindoIds((atual) => [...atual, ...ids]);
+    try {
+      await excluirReservasAdmin({ data: { ids } });
+      setReservas((atual) => atual.filter((r) => !ids.includes(r.id)));
+    } finally {
+      setExcluindoIds((atual) => atual.filter((id) => !ids.includes(id)));
+    }
+  }
 
   async function salvarEmail(e: React.FormEvent) {
     e.preventDefault();
@@ -228,6 +260,30 @@ function Admin() {
         {emailSalvo && <p className="mt-2 text-sm text-leaf">E-mail salvo com sucesso.</p>}
       </section>
 
+      <section className="mt-6 rounded-2xl border border-border bg-card p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-display text-xl text-foreground">Receber novas reservas</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {reservasAbertas
+                ? "O site está aceitando novas solicitações de reserva normalmente."
+                : "As novas solicitações estão pausadas — o site mostra um aviso pro cliente."}
+            </p>
+          </div>
+          <button
+            onClick={alternarStatusReservas}
+            disabled={alterandoStatus}
+            className={`rounded-full px-5 py-2 text-sm font-medium transition disabled:opacity-60 ${
+              reservasAbertas
+                ? "border border-input text-foreground hover:bg-secondary"
+                : "bg-primary text-primary-foreground hover:opacity-90"
+            }`}
+          >
+            {alterandoStatus ? "Salvando..." : reservasAbertas ? "Pausar reservas" : "Reativar reservas"}
+          </button>
+        </div>
+      </section>
+
       <section className="mt-8">
         <h2 className="font-display text-2xl text-foreground">Solicitações</h2>
         <div className="mt-4 space-y-4">
@@ -291,7 +347,7 @@ function Admin() {
                   ))}
                 </div>
 
-                <div className="mt-4 flex gap-3">
+                <div className="mt-4 flex flex-wrap gap-3">
                   <button
                     onClick={() => atualizarGrupo(ids, { status: "aprovada" })}
                     className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
@@ -303,6 +359,13 @@ function Admin() {
                     className="rounded-full border border-input px-5 py-2 text-sm text-foreground transition hover:bg-secondary"
                   >
                     {grupo.length > 1 ? "Recusar todas" : "Recusar"}
+                  </button>
+                  <button
+                    onClick={() => excluirGrupo(ids)}
+                    disabled={ids.some((id) => excluindoIds.includes(id))}
+                    className="rounded-full border border-destructive/40 px-5 py-2 text-sm text-destructive transition hover:bg-destructive/10 disabled:opacity-60"
+                  >
+                    {ids.some((id) => excluindoIds.includes(id)) ? "Excluindo..." : "Excluir"}
                   </button>
                 </div>
               </div>

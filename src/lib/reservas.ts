@@ -107,6 +107,16 @@ export async function lerDatasPendentes(): Promise<string[]> {
  * setembro até fevereiro. O mesmo limite também é aplicado no banco
  * de dados (não depende só disso aqui pra ser seguro).
  */
+/** Checa se o site está aceitando novas reservas no momento */
+export async function reservasEstaoAbertas(): Promise<boolean> {
+  const { data, error } = await supabase.rpc("reservas_estao_abertas");
+  if (error) {
+    console.error("Erro ao checar status das reservas:", error.message);
+    return true; // por segurança, não trava o formulário por causa de um erro de leitura
+  }
+  return data ?? true;
+}
+
 export function janelaDeReserva(): { min: string; max: string } {
   const hoje = new Date();
   const inicio = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);

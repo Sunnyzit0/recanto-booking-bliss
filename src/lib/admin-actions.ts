@@ -251,6 +251,41 @@ export const alternarBloqueioAdmin = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+/** Exclui uma ou mais reservas (usado pra limpar reservas antigas/já passadas) */
+export const excluirReservasAdmin = createServerFn({ method: "POST" })
+  .validator(z.object({ ids: z.array(z.string().uuid()).min(1).max(50) }))
+  .handler(async ({ data }) => {
+    exigirSessaoValida();
+    const { error } = await supabaseAdmin().from("reservas").delete().in("id", data.ids);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// --- Ligar/desligar recebimento de novas reservas no site ---
+
+export const obterStatusReservas = createServerFn({ method: "GET" }).handler(async () => {
+  exigirSessaoValida();
+  const { data, error } = await supabaseAdmin()
+    .from("configuracoes")
+    .select("valor")
+    .eq("chave", "reservas_abertas")
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  // Se nunca foi configurado, considera aberto por padrão
+  return { abertas: data?.valor !== "false" };
+});
+
+export const definirStatusReservas = createServerFn({ method: "POST" })
+  .validator(z.object({ abertas: z.boolean() }))
+  .handler(async ({ data }) => {
+    exigirSessaoValida();
+    const { error } = await supabaseAdmin()
+      .from("configuracoes")
+      .upsert({ chave: "reservas_abertas", valor: data.abertas ? "true" : "false" });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 // --- Configuração do e-mail que recebe avisos de reserva nova ---
 
 export const obterEmailAdmin = createServerFn({ method: "GET" }).handler(async () => {

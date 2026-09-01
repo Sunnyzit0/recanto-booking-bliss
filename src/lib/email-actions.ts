@@ -70,6 +70,16 @@ export const criarSolicitacaoServidor = createServerFn({ method: "POST" })
   .validator(CriarSolicitacaoSchema)
   .handler(async ({ data }) => {
     const client = supabaseAdmin();
+
+    const { data: config } = await client
+      .from("configuracoes")
+      .select("valor")
+      .eq("chave", "reservas_abertas")
+      .maybeSingle();
+    if (config?.valor === "false") {
+      throw new Error("No momento não estamos aceitando novas reservas.");
+    }
+
     const grupoId = crypto.randomUUID();
     const linhas = data.datas.map((d) => ({
       nome: data.nome,

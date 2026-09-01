@@ -1,6 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, MessageCircle, Phone, Settings } from "lucide-react";
+import { MapPin, MessageCircle, Phone } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
 import { criarSolicitacaoServidor } from "@/lib/email-actions";
@@ -14,6 +14,7 @@ import {
   lerBloqueios,
   lerDatasOcupadas,
   lerDatasPendentes,
+  reservasEstaoAbertas,
   telefoneValido,
 } from "@/lib/reservas";
 
@@ -104,17 +105,20 @@ function Home() {
   const [erroEnvio, setErroEnvio] = useState<string | null>(null);
   const enviandoRef = useRef(false);
   const [erroConexao, setErroConexao] = useState(false);
+  const [reservasAbertas, setReservasAbertas] = useState(true);
 
   async function carregar() {
     try {
-      const [novasDatas, novasPendentes, novosBloqueios] = await Promise.all([
+      const [novasDatas, novasPendentes, novosBloqueios, abertas] = await Promise.all([
         lerDatasOcupadas(),
         lerDatasPendentes(),
         lerBloqueios(),
+        reservasEstaoAbertas(),
       ]);
       setDatasOcupadas(novasDatas);
       setDatasPendentes(novasPendentes);
       setBloqueios(novosBloqueios);
+      setReservasAbertas(abertas);
       setErroConexao(false);
     } catch (erro) {
       console.error("Falha ao carregar disponibilidade:", erro);
@@ -155,6 +159,10 @@ function Home() {
     if (enviandoRef.current) return;
     if (erroConexao) {
       setErroEnvio("Não conseguimos confirmar a disponibilidade agora. Recarregue a página e tente de novo.");
+      return;
+    }
+    if (!reservasAbertas) {
+      setErroEnvio("No momento não estamos aceitando novas reservas.");
       return;
     }
     if (!nome.trim() || datasEscolhidas.length === 0) return;
@@ -288,8 +296,8 @@ function Home() {
         <p className="mt-4 max-w-3xl text-muted-foreground">
           Espaço para alugar por diária, com capacidade para {CONFIG.capacidade} (pode passar um
           pouco disso). O aluguel inclui toda a estrutura: piscina com cascata, churrasqueira,
-          fogão a lenha, área gourmet completa e wi-fi. Ideal para encontros de família, momentos
-          de lazer e pré-eventos como chá de bebê e despedida de solteiro.
+          fogão a lenha, área gourmet completa e wi-fi. Ideal para todo tipo de evento e
+          celebração, dos encontros em família às festas maiores.
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -335,6 +343,13 @@ function Home() {
             <p className="mt-4 rounded-lg bg-destructive/10 px-4 py-3 text-sm text-destructive">
               Não foi possível carregar as datas disponíveis agora. Verifique sua internet ou tente
               recarregar a página em instantes.
+            </p>
+          )}
+
+          {!erroConexao && !reservasAbertas && (
+            <p className="mt-4 rounded-lg bg-accent px-4 py-3 text-sm text-accent-foreground">
+              No momento não estamos recebendo novas solicitações de reserva. Entre em contato pelo
+              WhatsApp pra mais informações.
             </p>
           )}
 
@@ -423,7 +438,7 @@ function Home() {
 
               <button
                 type="submit"
-                disabled={enviando || datasEscolhidas.length === 0}
+                disabled={enviando || datasEscolhidas.length === 0 || !reservasAbertas || erroConexao}
                 className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
               >
                 {enviando ? "Enviando..." : "Enviar solicitação"}
@@ -507,17 +522,6 @@ function Home() {
               className="absolute inset-0"
             />
           </div>
-        </div>
-
-        <div className="mt-12 flex justify-center border-t border-border pt-6">
-          <Link
-            to="/admin"
-            aria-label="Área do administrador"
-            title="Área do administrador"
-            className="flex h-9 w-9 items-center justify-center rounded-full text-muted-foreground/50 transition hover:bg-secondary hover:text-muted-foreground"
-          >
-            <Settings className="h-4 w-4" />
-          </Link>
         </div>
       </footer>
     </main>
