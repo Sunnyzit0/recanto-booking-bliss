@@ -135,7 +135,7 @@ async function enviarEmailNovaReserva(dados: {
   const listaDatas = dados.datas.map(formatarData).join(", ");
 
   await resend().emails.send({
-    from: "Recanto da Piscina <onboarding@resend.dev>",
+    from: "Recanto da Piscina <reservas@recantodapiscina.com.br>",
     to: emailAdmin,
     subject: `Nova solicitação de reserva — ${listaDatas}`,
     html: `
