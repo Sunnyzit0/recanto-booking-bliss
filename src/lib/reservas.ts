@@ -20,14 +20,12 @@ export const CONFIG = {
   horario: "das 8h às 20h (12 horas)",
   pagamento: "Pix ou dinheiro",
   cancelamento: "Cancelamento gratuito até 7 dias antes da data reservada.",
+  // Regras do espaço — o cliente ainda vai definir o texto. Enquanto
+  // estiver vazio, a seção não aparece no site.
+  regras: [] as string[],
   // O login do admin agora é feito por senha única, verificada no
   // servidor (variável de ambiente ADMIN_PASSWORD) — veja src/lib/admin-actions.ts.
 };
-
-/** Valor da diária: R$600, fixo. */
-export function calcularValorDiaria(_dataISO: string): number {
-  return 600;
-}
 
 export type Status = "pendente" | "aprovada" | "recusada";
 
@@ -41,6 +39,7 @@ export type Reserva = {
   horario: string;
   status: Status;
   grupo_id?: string | null;
+  observacao?: string | null;
 };
 
 export function formatarTelefone(valor: string): string {
@@ -115,6 +114,34 @@ export async function reservasEstaoAbertas(): Promise<boolean> {
     return true; // por segurança, não trava o formulário por causa de um erro de leitura
   }
   return data ?? true;
+}
+
+export type ConfigPublica = { valorDiaria: number; capacidade: string; horario: string };
+
+const CONFIG_PADRAO: ConfigPublica = {
+  valorDiaria: 600,
+  capacidade: "até 40 pessoas",
+  horario: "das 8h às 20h (12 horas)",
+};
+
+/**
+ * Lê preço/capacidade/horário configurados pelo admin no painel. Se
+ * ainda não foram configurados, usa os valores padrão acima.
+ */
+export async function lerConfigPublica(): Promise<ConfigPublica> {
+  const { data, error } = await supabase.rpc("obter_config_publica");
+  if (error || !data) {
+    console.error("Erro ao ler configuração pública:", error?.message);
+    return CONFIG_PADRAO;
+  }
+  const mapa = Object.fromEntries(
+    (data as { chave: string; valor: string }[]).map((c) => [c.chave, c.valor]),
+  );
+  return {
+    valorDiaria: Number(mapa.valor_diaria) || CONFIG_PADRAO.valorDiaria,
+    capacidade: mapa.capacidade || CONFIG_PADRAO.capacidade,
+    horario: mapa.horario || CONFIG_PADRAO.horario,
+  };
 }
 
 export function janelaDeReserva(): { min: string; max: string } {

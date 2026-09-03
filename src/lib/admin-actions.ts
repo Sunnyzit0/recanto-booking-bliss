@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHmac, timingSafeEqual, randomBytes, scryptSync } from "node:crypto";
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
@@ -104,6 +104,42 @@ export function supabaseAdmin() {
   return createClient(url, chaveSecreta, { auth: { persistSession: false } });
 }
 
+// --- Senha do admin: guardada no banco (com hash), permite trocar
+// pelo próprio painel. Se nunca foi trocada ainda, usa a variável de
+// ambiente ADMIN_PASSWORD como valor inicial (compatibilidade).
+
+function gerarHashSenha(senha: string): string {
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(senha, salt, 64).toString("hex");
+  return `${salt}:${hash}`;
+}
+
+function conferirHashSenha(senha: string, armazenado: string): boolean {
+  const [salt, hashEsperado] = armazenado.split(":");
+  if (!salt || !hashEsperado) return false;
+  const hashCalculado = scryptSync(senha, salt, 64).toString("hex");
+  const bufA = Buffer.from(hashCalculado, "hex");
+  const bufB = Buffer.from(hashEsperado, "hex");
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+async function conferirSenhaAdmin(senha: string): Promise<boolean> {
+  const { data } = await supabaseAdmin()
+    .from("configuracoes")
+    .select("valor")
+    .eq("chave", "admin_senha_hash")
+    .maybeSingle();
+
+  if (data?.valor) {
+    return conferirHashSenha(senha, data.valor);
+  }
+  // Ainda não trocou a senha pelo painel — usa a variável de ambiente
+  const senhaPadrao = process.env.ADMIN_PASSWORD;
+  if (!senhaPadrao) throw new Error("ADMIN_PASSWORD não configurada no servidor.");
+  return senha === senhaPadrao;
+}
+
 /**
  * Traduz o erro de "duas reservas aprovadas na mesma data" (bloqueado
  * por uma trava no próprio banco) numa mensagem que faz sentido pro
@@ -130,6 +166,7 @@ const MudancaReservaSchema = z
     valor: z.number().positive().max(100000).optional(),
     horario: z.string().min(1).max(100).optional(),
     status: z.enum(["pendente", "aprovada", "recusada"]).optional(),
+    observacao: z.string().max(1000).optional(),
   })
   .strict()
   .refine((obj) => Object.keys(obj).length > 0, { message: "Nada para atualizar" });
@@ -147,9 +184,6 @@ const AlternarBloqueioSchema = z.object({ data: DataISO, jaBloqueada: z.boolean(
 export const loginAdmin = createServerFn({ method: "POST" })
   .validator(LoginSchema)
   .handler(async ({ data }) => {
-    const senhaCorreta = process.env.ADMIN_PASSWORD;
-    if (!senhaCorreta) throw new Error("ADMIN_PASSWORD não configurada no servidor.");
-
     const tentativas = lerTentativas();
     const agora = Date.now();
 
@@ -158,7 +192,9 @@ export const loginAdmin = createServerFn({ method: "POST" })
       return { ok: false, bloqueado: true, minutosRestantes };
     }
 
-    if (data.senha !== senhaCorreta) {
+    const senhaCorreta = await conferirSenhaAdmin(data.senha);
+
+    if (!senhaCorreta) {
       const novaContagem = tentativas.contagem + 1;
       if (novaContagem >= MAX_TENTATIVAS) {
         salvarTentativas({ contagem: 0, bloqueadoAte: agora + BLOQUEIO_MINUTOS * 60_000 });
@@ -306,6 +342,64 @@ export const salvarEmailAdmin = createServerFn({ method: "POST" })
     const { error } = await supabaseAdmin()
       .from("configuracoes")
       .upsert({ chave: "email_admin", valor: data.email });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// --- Trocar a senha do admin (pelo próprio painel) ---
+
+export const trocarSenhaAdmin = createServerFn({ method: "POST" })
+  .validator(z.object({ senhaAtual: z.string().min(1), novaSenha: z.string().min(6).max(200) }))
+  .handler(async ({ data }) => {
+    exigirSessaoValida();
+
+    const senhaAtualCorreta = await conferirSenhaAdmin(data.senhaAtual);
+    if (!senhaAtualCorreta) {
+      return { ok: false, erro: "Senha atual incorreta." };
+    }
+
+    const novoHash = gerarHashSenha(data.novaSenha);
+    const { error } = await supabaseAdmin()
+      .from("configuracoes")
+      .upsert({ chave: "admin_senha_hash", valor: novoHash });
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
+// --- Configurações editáveis do site (preço, capacidade, horário) ---
+
+const ConfigSiteSchema = z.object({
+  valorDiaria: z.number().positive().max(100000),
+  capacidade: z.string().min(1).max(100),
+  horario: z.string().min(1).max(100),
+});
+
+export const obterConfigSiteAdmin = createServerFn({ method: "GET" }).handler(async () => {
+  exigirSessaoValida();
+  const { data, error } = await supabaseAdmin()
+    .from("configuracoes")
+    .select("chave, valor")
+    .in("chave", ["valor_diaria", "capacidade", "horario"]);
+  if (error) throw new Error(error.message);
+
+  const mapa = Object.fromEntries((data ?? []).map((c) => [c.chave, c.valor]));
+  return {
+    valorDiaria: Number(mapa.valor_diaria) || 600,
+    capacidade: mapa.capacidade || "até 40 pessoas",
+    horario: mapa.horario || "das 8h às 20h (12 horas)",
+  };
+});
+
+export const salvarConfigSiteAdmin = createServerFn({ method: "POST" })
+  .validator(ConfigSiteSchema)
+  .handler(async ({ data }) => {
+    exigirSessaoValida();
+    const { error } = await supabaseAdmin().from("configuracoes").upsert([
+      { chave: "valor_diaria", valor: String(data.valorDiaria) },
+      { chave: "capacidade", valor: data.capacidade },
+      { chave: "horario", valor: data.horario },
+    ]);
     if (error) throw new Error(error.message);
     return { ok: true };
   });

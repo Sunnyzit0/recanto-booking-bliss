@@ -6,7 +6,7 @@ import { BotaoTema } from "@/components/BotaoTema";
 import { criarSolicitacaoServidor } from "@/lib/email-actions";
 import {
   CONFIG,
-  calcularValorDiaria,
+  lerConfigPublica,
   escutarBloqueios,
   formatarData,
   formatarTelefone,
@@ -106,19 +106,23 @@ function Home() {
   const enviandoRef = useRef(false);
   const [erroConexao, setErroConexao] = useState(false);
   const [reservasAbertas, setReservasAbertas] = useState(true);
+  const [config, setConfig] = useState({ valorDiaria: 600, capacidade: "até 40 pessoas", horario: "das 8h às 20h (12 horas)" });
+  const [logoAmpliada, setLogoAmpliada] = useState(false);
 
   async function carregar() {
     try {
-      const [novasDatas, novasPendentes, novosBloqueios, abertas] = await Promise.all([
+      const [novasDatas, novasPendentes, novosBloqueios, abertas, configPublica] = await Promise.all([
         lerDatasOcupadas(),
         lerDatasPendentes(),
         lerBloqueios(),
         reservasEstaoAbertas(),
+        lerConfigPublica(),
       ]);
       setDatasOcupadas(novasDatas);
       setDatasPendentes(novasPendentes);
       setBloqueios(novosBloqueios);
       setReservasAbertas(abertas);
+      setConfig(configPublica);
       setErroConexao(false);
     } catch (erro) {
       console.error("Falha ao carregar disponibilidade:", erro);
@@ -150,7 +154,7 @@ function Home() {
     });
   }
 
-  const valorTotal = datasEscolhidas.reduce((soma, d) => soma + calcularValorDiaria(d), 0);
+  const valorTotal = datasEscolhidas.length * config.valorDiaria;
 
   async function enviar(e: React.FormEvent) {
     e.preventDefault();
@@ -189,7 +193,7 @@ function Home() {
           telefone,
           email: email || undefined,
           datas: datasEscolhidas,
-          horario: CONFIG.horario,
+          horario: config.horario,
         },
       });
       setEnviada(true);
@@ -217,11 +221,18 @@ function Home() {
       <header className="sticky top-0 z-10 border-b border-border/60 bg-background/80 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
           <div className="flex items-center gap-3">
-            <img
-              src={logo}
-              alt="Logo Recanto da Piscina"
-              className="h-11 w-11 rounded-full object-cover ring-2 ring-border"
-            />
+            <button
+              type="button"
+              onClick={() => setLogoAmpliada(true)}
+              aria-label="Ver logo ampliada"
+              className="rounded-full ring-2 ring-border transition hover:opacity-80"
+            >
+              <img
+                src={logo}
+                alt="Logo Recanto da Piscina"
+                className="h-11 w-11 rounded-full object-cover"
+              />
+            </button>
             <span className="font-display hidden text-lg text-foreground sm:inline">
               {CONFIG.nome}
             </span>
@@ -294,7 +305,7 @@ function Home() {
       <section className="mx-auto max-w-5xl px-4 py-14">
         <h2 className="font-display text-3xl text-foreground">Sobre o espaço</h2>
         <p className="mt-4 max-w-3xl text-muted-foreground">
-          Espaço para alugar por diária, com capacidade para {CONFIG.capacidade} (pode passar um
+          Espaço para alugar por diária, com capacidade para {config.capacidade} (pode passar um
           pouco disso). O aluguel inclui toda a estrutura: piscina com cascata, churrasqueira,
           fogão a lenha, área gourmet completa e wi-fi. Ideal para todo tipo de evento e
           celebração, dos encontros em família às festas maiores.
@@ -331,7 +342,7 @@ function Home() {
         <div className="mx-auto max-w-5xl px-4">
           <h2 className="font-display text-3xl text-foreground">Reserve sua data</h2>
           <p className="mt-2 text-muted-foreground">
-            Diária: <strong>R$ 600</strong> ({CONFIG.horario}).
+            Diária: <strong>R$ {config.valorDiaria}</strong> ({config.horario}).
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             Reservas abertas de {formatarData(janela.min)} até {formatarData(janela.max)}. Escolha
@@ -414,7 +425,7 @@ function Home() {
                       <li key={d} className="flex items-center justify-between rounded-lg bg-secondary px-3 py-2 text-foreground">
                         <span>{formatarData(d)}</span>
                         <span className="flex items-center gap-2">
-                          R$ {calcularValorDiaria(d)}
+                          R$ {config.valorDiaria}
                           <button
                             type="button"
                             onClick={() => alternarData(d)}
@@ -524,6 +535,32 @@ function Home() {
           </div>
         </div>
       </footer>
+
+      {CONFIG.regras.length > 0 && (
+        <section className="mx-auto max-w-5xl px-4 py-10">
+          <h2 className="font-display text-2xl text-foreground">Regras do espaço</h2>
+          <ul className="mt-4 list-disc space-y-2 pl-5 text-muted-foreground">
+            {CONFIG.regras.map((regra, i) => (
+              <li key={i}>{regra}</li>
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <p className="pb-8 text-center text-sm italic text-muted-foreground">Vem aí novidades...</p>
+
+      {logoAmpliada && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
+          onClick={() => setLogoAmpliada(false)}
+        >
+          <img
+            src={logo}
+            alt="Logo Recanto da Piscina ampliada"
+            className="max-h-[80vh] max-w-[80vw] rounded-2xl object-contain"
+          />
+        </div>
+      )}
     </main>
   );
 }

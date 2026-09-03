@@ -3,7 +3,7 @@ import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { Resend } from "resend";
 import { segredoSessao, supabaseAdmin, traduzirErroBanco } from "@/lib/admin-actions";
-import { CONFIG, calcularValorDiaria, formatarData } from "@/lib/reservas";
+import { CONFIG, formatarData } from "@/lib/reservas";
 
 // Instância própria (não compartilhada com admin-actions.ts) — evita um
 // bug de separação cliente/servidor quando a mesma instância é usada
@@ -80,13 +80,20 @@ export const criarSolicitacaoServidor = createServerFn({ method: "POST" })
       throw new Error("No momento não estamos aceitando novas reservas.");
     }
 
+    const { data: configValor } = await client
+      .from("configuracoes")
+      .select("valor")
+      .eq("chave", "valor_diaria")
+      .maybeSingle();
+    const valorDiaria = Number(configValor?.valor) || 600;
+
     const grupoId = crypto.randomUUID();
     const linhas = data.datas.map((d) => ({
       nome: data.nome,
       telefone: data.telefone,
       email: data.email || null,
       data: d,
-      valor: calcularValorDiaria(d),
+      valor: valorDiaria,
       horario: data.horario,
       status: "pendente" as const,
       grupo_id: grupoId,
@@ -100,7 +107,7 @@ export const criarSolicitacaoServidor = createServerFn({ method: "POST" })
     // Manda o e-mail pro dono, mas se der erro no e-mail a reserva já
     // foi gravada — não trava o cliente por causa disso.
     try {
-      await enviarEmailNovaReserva({ ...data, ids });
+      await enviarEmailNovaReserva({ ...data, ids, valorDiaria });
     } catch (erroEmail) {
       console.error("Falha ao enviar e-mail de notificação:", erroEmail);
     }
@@ -115,6 +122,7 @@ async function enviarEmailNovaReserva(dados: {
   datas: string[];
   horario: string;
   ids: string[];
+  valorDiaria: number;
 }) {
   const { data: config } = await supabaseAdmin()
     .from("configuracoes")
@@ -128,7 +136,7 @@ async function enviarEmailNovaReserva(dados: {
     return;
   }
 
-  const valorTotal = dados.datas.reduce((soma, d) => soma + calcularValorDiaria(d), 0);
+  const valorTotal = dados.datas.length * (dados.valorDiaria ?? 600);
   const linkAprovar = `${CONFIG.urlBase}/confirmar?token=${assinarToken({ ids: dados.ids, status: "aprovada" })}`;
   const linkRecusar = `${CONFIG.urlBase}/confirmar?token=${assinarToken({ ids: dados.ids, status: "recusada" })}`;
 

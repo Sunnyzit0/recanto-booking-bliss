@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { AlertTriangle, MessageCircle } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
 import {
@@ -11,10 +12,13 @@ import {
   listarBloqueiosAdmin,
   listarReservasAdmin,
   loginAdmin,
+  obterConfigSiteAdmin,
   obterEmailAdmin,
   obterStatusReservas,
   sairAdmin,
+  salvarConfigSiteAdmin,
   salvarEmailAdmin,
+  trocarSenhaAdmin,
   verificarSessaoAdmin,
 } from "@/lib/admin-actions";
 import { formatarData, type Reserva, type Status } from "@/lib/reservas";
@@ -38,6 +42,11 @@ const CORES: Record<Status, string> = {
   recusada: "bg-destructive/10 text-destructive",
 };
 
+function linkWhatsApp(telefone: string) {
+  const digitos = telefone.replace(/\D/g, "");
+  return `https://wa.me/55${digitos}`;
+}
+
 function Admin() {
   const [logado, setLogado] = useState(false);
   const [verificandoSessao, setVerificandoSessao] = useState(true);
@@ -56,6 +65,20 @@ function Admin() {
   const [reservasAbertas, setReservasAbertas] = useState(true);
   const [alterandoStatus, setAlterandoStatus] = useState(false);
   const [excluindoIds, setExcluindoIds] = useState<string[]>([]);
+
+  const [busca, setBusca] = useState("");
+  const [filtroStatus, setFiltroStatus] = useState<Status | "todas">("todas");
+
+  const [configSite, setConfigSite] = useState({ valorDiaria: 600, capacidade: "", horario: "" });
+  const [salvandoConfig, setSalvandoConfig] = useState(false);
+  const [configSalva, setConfigSalva] = useState(false);
+
+  const [senhaAtual, setSenhaAtual] = useState("");
+  const [novaSenha, setNovaSenha] = useState("");
+  const [confirmarNovaSenha, setConfirmarNovaSenha] = useState("");
+  const [trocandoSenha, setTrocandoSenha] = useState(false);
+  const [erroSenha, setErroSenha] = useState<string | null>(null);
+  const [senhaTrocada, setSenhaTrocada] = useState(false);
 
   // Verifica se já existe uma sessão válida (cookie assinado no servidor)
   useEffect(() => {
@@ -106,6 +129,7 @@ function Admin() {
     carregar();
     obterEmailAdmin().then((r) => setEmailAdmin(r.email));
     obterStatusReservas().then((r) => setReservasAbertas(r.abertas));
+    obterConfigSiteAdmin().then(setConfigSite);
     // Sem login "realtime" do banco aqui — atualiza a cada 20s, e também
     // logo depois de qualquer ação (aprovar, recusar, editar, bloquear).
     const intervalo = setInterval(carregar, 20_000);
@@ -145,6 +169,46 @@ function Admin() {
       setEmailSalvo(true);
     } finally {
       setSalvandoEmail(false);
+    }
+  }
+
+  async function salvarConfig(e: React.FormEvent) {
+    e.preventDefault();
+    setSalvandoConfig(true);
+    setConfigSalva(false);
+    try {
+      await salvarConfigSiteAdmin({ data: configSite });
+      setConfigSalva(true);
+    } finally {
+      setSalvandoConfig(false);
+    }
+  }
+
+  async function trocarSenha(e: React.FormEvent) {
+    e.preventDefault();
+    setErroSenha(null);
+    setSenhaTrocada(false);
+    if (novaSenha.length < 6) {
+      setErroSenha("A nova senha precisa ter pelo menos 6 caracteres.");
+      return;
+    }
+    if (novaSenha !== confirmarNovaSenha) {
+      setErroSenha("As senhas novas não são iguais.");
+      return;
+    }
+    setTrocandoSenha(true);
+    try {
+      const resultado = await trocarSenhaAdmin({ data: { senhaAtual, novaSenha } });
+      if (resultado.ok) {
+        setSenhaTrocada(true);
+        setSenhaAtual("");
+        setNovaSenha("");
+        setConfirmarNovaSenha("");
+      } else {
+        setErroSenha(resultado.erro ?? "Não foi possível trocar a senha.");
+      }
+    } finally {
+      setTrocandoSenha(false);
     }
   }
 
@@ -231,6 +295,41 @@ function Admin() {
         </div>
       </div>
 
+      <section className="mt-6 grid gap-4 sm:grid-cols-3">
+        {(() => {
+          const hojeISO = new Date().toISOString().slice(0, 10);
+          const mesAtual = hojeISO.slice(0, 7);
+          const pendentes = new Set(
+            reservas.filter((r) => r.status === "pendente").map((r) => r.grupo_id ?? r.id),
+          ).size;
+          const aprovadasEsteMes = reservas.filter(
+            (r) => r.status === "aprovada" && r.data.slice(0, 7) === mesAtual,
+          ).length;
+          const proxima = reservas
+            .filter((r) => r.status === "aprovada" && r.data >= hojeISO)
+            .sort((a, b) => a.data.localeCompare(b.data))[0];
+
+          return (
+            <>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <p className="text-xs text-muted-foreground">Solicitações pendentes</p>
+                <p className="font-display text-3xl text-foreground">{pendentes}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <p className="text-xs text-muted-foreground">Aprovadas este mês</p>
+                <p className="font-display text-3xl text-foreground">{aprovadasEsteMes}</p>
+              </div>
+              <div className="rounded-2xl border border-border bg-card p-4">
+                <p className="text-xs text-muted-foreground">Próxima reserva</p>
+                <p className="font-display text-2xl text-foreground">
+                  {proxima ? formatarData(proxima.data) : "—"}
+                </p>
+              </div>
+            </>
+          );
+        })()}
+      </section>
+
       <section className="mt-8 rounded-2xl border border-border bg-card p-5">
         <h2 className="font-display text-xl text-foreground">Aviso por e-mail</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -273,25 +372,150 @@ function Admin() {
           <button
             onClick={alternarStatusReservas}
             disabled={alterandoStatus}
-            className={`rounded-full px-5 py-2 text-sm font-medium transition disabled:opacity-60 ${
+            className={`flex items-center gap-2 rounded-full px-5 py-2 text-sm font-semibold transition disabled:opacity-60 ${
               reservasAbertas
-                ? "border border-input text-foreground hover:bg-secondary"
+                ? "bg-destructive text-destructive-foreground shadow-md hover:opacity-90"
                 : "bg-primary text-primary-foreground hover:opacity-90"
             }`}
           >
+            {reservasAbertas && <AlertTriangle className="h-4 w-4" />}
             {alterandoStatus ? "Salvando..." : reservasAbertas ? "Pausar reservas" : "Reativar reservas"}
           </button>
         </div>
       </section>
 
+      <section className="mt-6 rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-display text-xl text-foreground">Preço, capacidade e horário</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Esses valores aparecem no site pro cliente. Edite aqui sem precisar mexer em código.
+        </p>
+        <form onSubmit={salvarConfig} className="mt-4 grid gap-3 sm:grid-cols-3">
+          <label className="text-xs text-muted-foreground">
+            Valor da diária (R$)
+            <input
+              type="number"
+              value={configSite.valorDiaria}
+              onChange={(e) => {
+                setConfigSite((c) => ({ ...c, valorDiaria: Number(e.target.value) }));
+                setConfigSalva(false);
+              }}
+              className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="text-xs text-muted-foreground">
+            Capacidade
+            <input
+              value={configSite.capacidade}
+              onChange={(e) => {
+                setConfigSite((c) => ({ ...c, capacidade: e.target.value }));
+                setConfigSalva(false);
+              }}
+              className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <label className="text-xs text-muted-foreground">
+            Horário
+            <input
+              value={configSite.horario}
+              onChange={(e) => {
+                setConfigSite((c) => ({ ...c, horario: e.target.value }));
+                setConfigSalva(false);
+              }}
+              className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+          <div className="sm:col-span-3">
+            <button
+              type="submit"
+              disabled={salvandoConfig}
+              className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+            >
+              {salvandoConfig ? "Salvando..." : "Salvar"}
+            </button>
+            {configSalva && <span className="ml-3 text-sm text-leaf">Salvo com sucesso.</span>}
+          </div>
+        </form>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-display text-xl text-foreground">Trocar senha</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Muda a senha de acesso a esse painel.</p>
+        <form onSubmit={trocarSenha} className="mt-4 grid gap-3 sm:grid-cols-3">
+          <input
+            type="password"
+            value={senhaAtual}
+            onChange={(e) => setSenhaAtual(e.target.value)}
+            placeholder="Senha atual"
+            autoComplete="current-password"
+            required
+            className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+          />
+          <input
+            type="password"
+            value={novaSenha}
+            onChange={(e) => setNovaSenha(e.target.value)}
+            placeholder="Nova senha"
+            autoComplete="new-password"
+            required
+            className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+          />
+          <input
+            type="password"
+            value={confirmarNovaSenha}
+            onChange={(e) => setConfirmarNovaSenha(e.target.value)}
+            placeholder="Confirmar nova senha"
+            autoComplete="new-password"
+            required
+            className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+          />
+          <div className="sm:col-span-3">
+            <button
+              type="submit"
+              disabled={trocandoSenha}
+              className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+            >
+              {trocandoSenha ? "Salvando..." : "Trocar senha"}
+            </button>
+            {senhaTrocada && <span className="ml-3 text-sm text-leaf">Senha trocada com sucesso.</span>}
+            {erroSenha && <p className="mt-2 text-sm text-destructive">{erroSenha}</p>}
+          </div>
+        </form>
+      </section>
+
       <section className="mt-8">
-        <h2 className="font-display text-2xl text-foreground">Solicitações</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="font-display text-2xl text-foreground">Solicitações</h2>
+          <div className="flex flex-wrap gap-2">
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar por nome..."
+              className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+            />
+            <select
+              value={filtroStatus}
+              onChange={(e) => setFiltroStatus(e.target.value as Status | "todas")}
+              className="rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+            >
+              <option value="todas">Todas</option>
+              <option value="pendente">Pendentes</option>
+              <option value="aprovada">Aprovadas</option>
+              <option value="recusada">Recusadas</option>
+            </select>
+          </div>
+        </div>
         <div className="mt-4 space-y-4">
           {carregando && <p className="text-sm text-muted-foreground">Carregando reservas...</p>}
           {!carregando && reservas.length === 0 && (
             <p className="text-sm text-muted-foreground">Nenhuma solicitação recebida ainda.</p>
           )}
-          {agruparReservas(reservas).map((grupo) => {
+          {agruparReservas(
+            reservas.filter(
+              (r) =>
+                (filtroStatus === "todas" || r.status === filtroStatus) &&
+                r.nome.toLowerCase().includes(busca.toLowerCase()),
+            ),
+          ).map((grupo) => {
             const primeira = grupo[0];
             const ids = grupo.map((r) => r.id);
             const valorTotal = grupo.reduce((soma, r) => soma + r.valor, 0);
@@ -300,7 +524,15 @@ function Admin() {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div>
                     <p className="font-medium text-foreground">{primeira.nome}</p>
-                    <p className="text-sm text-muted-foreground">📞 {primeira.telefone}</p>
+                    <a
+                      href={linkWhatsApp(primeira.telefone)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-1 text-sm text-leaf hover:underline"
+                    >
+                      <MessageCircle className="h-3.5 w-3.5" />
+                      {primeira.telefone}
+                    </a>
                   </div>
                   <span className={`rounded-full px-3 py-1 text-xs capitalize ${CORES[primeira.status]}`}>
                     {primeira.status}
@@ -340,6 +572,16 @@ function Admin() {
                         <input
                           value={r.horario}
                           onChange={(e) => atualizar(r.id, { horario: e.target.value })}
+                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                        />
+                      </label>
+                      <label className="text-xs text-muted-foreground sm:col-span-3">
+                        Observação
+                        <textarea
+                          value={r.observacao ?? ""}
+                          onChange={(e) => atualizar(r.id, { observacao: e.target.value })}
+                          placeholder="Ex: cliente confirmou por telefone, pediu 1h a mais..."
+                          rows={2}
                           className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
                         />
                       </label>
