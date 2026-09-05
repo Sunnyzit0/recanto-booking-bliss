@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Lock } from "lucide-react";
 import { toISO } from "@/lib/reservas";
 
 const MESES = [
@@ -64,7 +65,10 @@ export function Calendario({
       "bg-green-100 text-green-800 hover:bg-green-200 dark:bg-green-900/50 dark:text-green-300 dark:hover:bg-green-900/70",
     pendente: "bg-orange-300 text-orange-950 dark:bg-orange-600/70 dark:text-orange-50",
     reservada: "bg-red-300 text-red-950 line-through dark:bg-red-700/70 dark:text-red-50",
-    indisponivel: "bg-yellow-300 text-yellow-950 line-through dark:bg-yellow-600/70 dark:text-yellow-50",
+    // Antes era amarelo, muito parecido com o laranja de "pendente" à
+    // primeira vista — trocado por um cinza-azulado (bem mais distante
+    // na roda de cores) e reforçado com o ícone de cadeado no dia.
+    indisponivel: "bg-slate-400 text-slate-950 line-through dark:bg-slate-600 dark:text-slate-50",
   };
 
   const TITULOS: Record<Estado, string | undefined> = {
@@ -138,7 +142,12 @@ export function Calendario({
                       : ESTILOS.disponivel,
               ].join(" ")}
             >
-              {dia}
+              <span className="relative flex h-full w-full items-center justify-center">
+                {dia}
+                {estado === "indisponivel" && (
+                  <Lock className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5" aria-hidden="true" />
+                )}
+              </span>
             </button>
           );
         })}
@@ -155,7 +164,8 @@ export function Calendario({
           <span className="h-3 w-3 rounded bg-red-300 dark:bg-red-700" /> Reservada
         </span>
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded bg-yellow-300 dark:bg-yellow-600" /> Indisponível
+          <span className="h-3 w-3 rounded bg-slate-400 dark:bg-slate-600" />
+          <Lock className="h-3 w-3" aria-hidden="true" /> Indisponível
         </span>
       </div>
     </div>
