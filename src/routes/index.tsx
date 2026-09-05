@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { MapPin, MessageCircle, Phone, Share2 } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
+import { CaptchaTurnstile, type CaptchaTurnstileHandle } from "@/components/CaptchaTurnstile";
 import { criarSolicitacaoServidor } from "@/lib/email-actions";
 import {
   CONFIG,
@@ -108,6 +109,9 @@ function Home() {
   const [reservasAbertas, setReservasAbertas] = useState(true);
   const [config, setConfig] = useState({ valorDiaria: 600, capacidade: "até 40 pessoas", horario: "das 8h às 20h (12 horas)" });
   const [logoAmpliada, setLogoAmpliada] = useState(false);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaTurnstileHandle>(null);
+  const captchaAtivo = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
 
   async function carregar() {
     try {
@@ -199,6 +203,10 @@ function Home() {
       setErroEnvio("Uma das datas escolhidas está fora do período permitido.");
       return;
     }
+    if (captchaAtivo && !turnstileToken) {
+      setErroEnvio("Aguarde a verificação de segurança terminar e tente de novo.");
+      return;
+    }
     enviandoRef.current = true;
     setEnviando(true);
     setErroEnvio(null);
@@ -210,6 +218,7 @@ function Home() {
           email: email || undefined,
           datas: datasEscolhidas,
           horario: config.horario,
+          turnstileToken: turnstileToken ?? undefined,
         },
       });
       setEnviada(true);
@@ -220,6 +229,8 @@ function Home() {
     } catch (erro) {
       console.error(erro);
       setErroEnvio("Não foi possível enviar sua solicitação. Tente novamente ou chame no WhatsApp.");
+      captchaRef.current?.reset();
+      setTurnstileToken(null);
     } finally {
       enviandoRef.current = false;
       setEnviando(false);
@@ -471,9 +482,17 @@ function Home() {
                 )}
               </div>
 
+              <CaptchaTurnstile ref={captchaRef} onToken={setTurnstileToken} />
+
               <button
                 type="submit"
-                disabled={enviando || datasEscolhidas.length === 0 || !reservasAbertas || erroConexao}
+                disabled={
+                  enviando ||
+                  datasEscolhidas.length === 0 ||
+                  !reservasAbertas ||
+                  erroConexao ||
+                  (captchaAtivo && !turnstileToken)
+                }
                 className="rounded-full bg-primary px-6 py-3 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
               >
                 {enviando ? "Enviando..." : "Enviar solicitação"}

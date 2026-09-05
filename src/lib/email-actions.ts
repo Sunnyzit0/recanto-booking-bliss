@@ -1,4 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
+import { getRequestIP } from "@tanstack/react-start/server";
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { z } from "zod";
 import { Resend } from "resend";
@@ -56,6 +57,70 @@ function lerToken(token: string): Payload | null {
   }
 }
 
+// --- Proteção anti-spam do formulário público (rate limit por IP) ---
+// Sem isso dava pra automatizar centenas de solicitações e estourar a
+// cota de e-mails do Resend. Limite generoso o bastante pra um cliente
+// de verdade nunca esbarrar nele, mesmo tentando de novo por engano.
+
+const LIMITE_RESERVAS_POR_HORA = 5;
+const JANELA_RESERVAS_MS = 60 * 60 * 1000;
+
+function chaveRateLimitReserva(): string {
+  const ip = getRequestIP({ xForwardedFor: true }) || "desconhecido";
+  return createHmac("sha256", segredoSessao()).update(`reserva-rate-limit:${ip}`).digest("hex");
+}
+
+async function checarRateLimitReserva(client: ReturnType<typeof supabaseAdmin>) {
+  const chave = chaveRateLimitReserva();
+  const agora = Date.now();
+
+  const { data } = await client
+    .from("reserva_rate_limit")
+    .select("contagem, janela_inicio")
+    .eq("chave", chave)
+    .maybeSingle();
+
+  const inicioJanelaAtual = data?.janela_inicio ? new Date(data.janela_inicio).getTime() : 0;
+  const dentroDaJanela = agora - inicioJanelaAtual < JANELA_RESERVAS_MS;
+  const contagemAtual = dentroDaJanela ? (data?.contagem ?? 0) : 0;
+
+  if (contagemAtual >= LIMITE_RESERVAS_POR_HORA) {
+    throw new Error("Muitas solicitações em pouco tempo. Aguarde um pouco ou chame no WhatsApp.");
+  }
+
+  await client.from("reserva_rate_limit").upsert({
+    chave,
+    contagem: contagemAtual + 1,
+    janela_inicio: new Date(dentroDaJanela ? inicioJanelaAtual : agora).toISOString(),
+  });
+}
+
+// --- Captcha discreto (Cloudflare Turnstile) — opcional ---
+// Só entra em ação se TURNSTILE_SECRET_KEY estiver configurada no
+// servidor; sem essa variável o formulário funciona normalmente (sem
+// captcha), então isso não quebra nada em quem ainda não configurou.
+// Pra ativar: crie um site em https://dash.cloudflare.com/?to=/:account/turnstile
+// e configure TURNSTILE_SECRET_KEY (servidor) + VITE_TURNSTILE_SITE_KEY (cliente).
+
+async function verificarTurnstile(token: string | undefined) {
+  const chaveSecreta = process.env.TURNSTILE_SECRET_KEY;
+  if (!chaveSecreta) return; // captcha não configurado — não bloqueia o envio
+
+  if (!token) {
+    throw new Error("Verificação de segurança pendente. Recarregue a página e tente de novo.");
+  }
+
+  const resposta = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({ secret: chaveSecreta, response: token }),
+  });
+  const resultado = (await resposta.json()) as { success: boolean };
+  if (!resultado.success) {
+    throw new Error("Verificação de segurança falhou. Recarregue a página e tente de novo.");
+  }
+}
+
 // --- Criar solicitação (chamado pelo formulário público) ---
 
 const CriarSolicitacaoSchema = z.object({
@@ -64,12 +129,16 @@ const CriarSolicitacaoSchema = z.object({
   email: z.string().email().max(200).optional().or(z.literal("")),
   datas: z.array(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).min(1).max(3),
   horario: z.string().min(1).max(100),
+  turnstileToken: z.string().optional(),
 });
 
 export const criarSolicitacaoServidor = createServerFn({ method: "POST" })
   .validator(CriarSolicitacaoSchema)
   .handler(async ({ data }) => {
     const client = supabaseAdmin();
+
+    await checarRateLimitReserva(client);
+    await verificarTurnstile(data.turnstileToken);
 
     const { data: config } = await client
       .from("configuracoes")
