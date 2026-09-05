@@ -30,11 +30,15 @@ npm run dev
 |---|---|---|
 | `VITE_SUPABASE_URL` | Cliente e servidor | URL do projeto Supabase |
 | `VITE_SUPABASE_ANON_KEY` | Cliente | Chave pública (anon) do Supabase |
-| `ADMIN_PASSWORD` | Só servidor | Senha de acesso ao `/admin` |
-| `SESSION_SECRET` | Só servidor | String aleatória (32+ caracteres) usada pra assinar o cookie de sessão |
+| `ADMIN_PASSWORD` | Só servidor | Senha de acesso ao `/admin` (valor inicial, até ser trocada pelo painel) |
+| `SESSION_SECRET` | Só servidor | String aleatória (32+ caracteres) usada pra assinar cookies de sessão, tokens de e-mail e chaves de rate limit |
 | `SUPABASE_SERVICE_ROLE_KEY` | Só servidor | Chave secreta do Supabase — nunca deve ter prefixo `VITE_` nem ser exposta ao navegador |
+| `RESEND_API_KEY` | Só servidor | Chave da API do Resend, usada pra enviar os e-mails de notificação de reserva |
+| `VITE_TURNSTILE_SITE_KEY` | Cliente (opcional) | Site key do Cloudflare Turnstile — ativa o captcha discreto no formulário de reserva |
+| `TURNSTILE_SECRET_KEY` | Só servidor (opcional) | Secret key do Cloudflare Turnstile — sem ela, o captcha fica desativado |
 
-As três últimas variáveis são configuradas direto no painel da Vercel (Settings → Environment Variables), nunca commitadas no Git.
+Veja `.env.example` na raiz do projeto pra descrições mais detalhadas. As variáveis "só servidor"
+são configuradas direto no painel da Vercel (Settings → Environment Variables), nunca commitadas no Git.
 
 ## Banco de dados (Supabase)
 
