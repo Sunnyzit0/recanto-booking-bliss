@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server";
+import { getCookie, setCookie, deleteCookie, getRequestIP } from "@tanstack/react-start/server";
 import { createClient } from "@supabase/supabase-js";
 import { createHmac, timingSafeEqual, randomBytes, scryptSync } from "node:crypto";
 import { z } from "zod";
@@ -14,7 +14,6 @@ import { CONFIG, formatarData } from "@/lib/reservas";
 // ---------------------------------------------------------------------------
 
 const COOKIE = "recanto_admin_sessao";
-const COOKIE_TENTATIVAS = "recanto_admin_tentativas";
 const DURACAO_SEGUNDOS = 60 * 60 * 24 * 30; // fica logado por 30 dias
 const MAX_TENTATIVAS = 3;
 const BLOQUEIO_MINUTOS = 30;
@@ -57,41 +56,47 @@ function exigirSessaoValida() {
 }
 
 // --- Controle de tentativas de login (trava por 30min após 3 erros) ---
+//
+// Guardado numa tabela no servidor (não num cookie): um cookie é
+// controlado pelo próprio navegador de quem está tentando logar, então
+// bastava limpar os cookies pra resetar o contador e continuar
+// tentando senha à vontade. Aqui a chave é um hash do IP de quem fez a
+// requisição — o hash evita guardar o IP em texto puro no banco.
 
 type EstadoTentativas = { contagem: number; bloqueadoAte: number };
 
-function lerTentativas(): EstadoTentativas {
-  const cookie = getCookie(COOKIE_TENTATIVAS);
-  if (!cookie) return { contagem: 0, bloqueadoAte: 0 };
-
-  const [contagemStr, bloqueadoAteStr, assinatura] = cookie.split(".");
-  const esperada = createHmac("sha256", segredoSessao())
-    .update(`tentativas:${contagemStr}:${bloqueadoAteStr}`)
-    .digest("hex");
-
-  const bufA = Buffer.from(assinatura || "", "hex");
-  const bufB = Buffer.from(esperada, "hex");
-  if (bufA.length !== bufB.length || !timingSafeEqual(bufA, bufB)) {
-    return { contagem: 0, bloqueadoAte: 0 };
-  }
-  return { contagem: Number(contagemStr) || 0, bloqueadoAte: Number(bloqueadoAteStr) || 0 };
+/** Identifica quem está tentando logar pelo IP (via cabeçalho de proxy da Vercel) */
+function chaveTentativas(): string {
+  const ip = getRequestIP({ xForwardedFor: true }) || "desconhecido";
+  return createHmac("sha256", segredoSessao()).update(`login-tentativa:${ip}`).digest("hex");
 }
 
-function salvarTentativas(estado: EstadoTentativas) {
-  const assinatura = createHmac("sha256", segredoSessao())
-    .update(`tentativas:${estado.contagem}:${estado.bloqueadoAte}`)
-    .digest("hex");
-  setCookie(COOKIE_TENTATIVAS, `${estado.contagem}.${estado.bloqueadoAte}.${assinatura}`, {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    path: "/",
-    maxAge: BLOQUEIO_MINUTOS * 60,
-  });
+async function lerTentativas(chave: string): Promise<EstadoTentativas> {
+  const { data } = await supabaseAdmin()
+    .from("admin_login_tentativas")
+    .select("contagem, bloqueado_ate")
+    .eq("chave", chave)
+    .maybeSingle();
+  if (!data) return { contagem: 0, bloqueadoAte: 0 };
+  return {
+    contagem: data.contagem ?? 0,
+    bloqueadoAte: data.bloqueado_ate ? new Date(data.bloqueado_ate).getTime() : 0,
+  };
 }
 
-function limparTentativas() {
-  deleteCookie(COOKIE_TENTATIVAS, { path: "/" });
+async function salvarTentativas(chave: string, estado: EstadoTentativas) {
+  await supabaseAdmin()
+    .from("admin_login_tentativas")
+    .upsert({
+      chave,
+      contagem: estado.contagem,
+      bloqueado_ate: estado.bloqueadoAte ? new Date(estado.bloqueadoAte).toISOString() : null,
+      atualizado_em: new Date().toISOString(),
+    });
+}
+
+async function limparTentativas(chave: string) {
+  await supabaseAdmin().from("admin_login_tentativas").delete().eq("chave", chave);
 }
 
 /** Cliente do Supabase com acesso total (só usado aqui, no servidor) */
@@ -233,7 +238,8 @@ const AlternarBloqueioSchema = z.object({ data: DataISO, jaBloqueada: z.boolean(
 export const loginAdmin = createServerFn({ method: "POST" })
   .validator(LoginSchema)
   .handler(async ({ data }) => {
-    const tentativas = lerTentativas();
+    const chave = chaveTentativas();
+    const tentativas = await lerTentativas(chave);
     const agora = Date.now();
 
     if (tentativas.bloqueadoAte > agora) {
@@ -246,14 +252,14 @@ export const loginAdmin = createServerFn({ method: "POST" })
     if (!senhaCorreta) {
       const novaContagem = tentativas.contagem + 1;
       if (novaContagem >= MAX_TENTATIVAS) {
-        salvarTentativas({ contagem: 0, bloqueadoAte: agora + BLOQUEIO_MINUTOS * 60_000 });
+        await salvarTentativas(chave, { contagem: 0, bloqueadoAte: agora + BLOQUEIO_MINUTOS * 60_000 });
         return { ok: false, bloqueado: true, minutosRestantes: BLOQUEIO_MINUTOS };
       }
-      salvarTentativas({ contagem: novaContagem, bloqueadoAte: 0 });
+      await salvarTentativas(chave, { contagem: novaContagem, bloqueadoAte: 0 });
       return { ok: false, bloqueado: false, tentativasRestantes: MAX_TENTATIVAS - novaContagem };
     }
 
-    limparTentativas();
+    await limparTentativas(chave);
 
     const expiraEm = agora + DURACAO_SEGUNDOS * 1000;
     const token = `${expiraEm}.${assinar(expiraEm)}`;
