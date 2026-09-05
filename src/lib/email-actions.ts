@@ -192,11 +192,45 @@ export const executarConfirmacaoPorToken = createServerFn({ method: "POST" })
     const payload = lerToken(data.token);
     if (!payload) throw new Error("Link inválido ou expirado.");
 
-    const { error } = await supabaseAdmin()
-      .from("reservas")
-      .update({ status: payload.status })
-      .in("id", payload.ids);
+    const client = supabaseAdmin();
+    const { error } = await client.from("reservas").update({ status: payload.status }).in("id", payload.ids);
     if (error) traduzirErroBanco(error);
+
+    const { data: linhas } = await client
+      .from("reservas")
+      .select("email, nome, data, valor, horario")
+      .in("id", payload.ids);
+    if (linhas) {
+      const comEmail = linhas.filter((l): l is typeof l & { email: string } => !!l.email);
+      if (comEmail.length > 0) {
+        const { email, nome, horario } = comEmail[0];
+        const datas = comEmail.map((l) => formatarData(l.data)).join(", ");
+        const valorTotal = comEmail.reduce((soma, l) => soma + l.valor, 0);
+        const aprovada = payload.status === "aprovada";
+        try {
+          await resend().emails.send({
+            from: `${CONFIG.nome} <reservas@recantodapiscina.com.br>`,
+            to: email,
+            subject: aprovada
+              ? `Sua reserva no ${CONFIG.nome} foi aprovada!`
+              : `Sobre sua solicitação no ${CONFIG.nome}`,
+            html: `<div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+                     <h2 style="color: #0C4137;">${CONFIG.nome}</h2>
+                     ${
+                       aprovada
+                         ? `<p>Boa notícia, ${nome}! Sua reserva para <strong>${datas}</strong> (${horario}) foi <strong>aprovada</strong>.</p>
+                            <p>Valor combinado: R$ ${valorTotal}. Pagamento: ${CONFIG.pagamento}.</p>
+                            <p>Qualquer dúvida, chama no telefone ${CONFIG.telefone}.</p>`
+                         : `<p>Olá, ${nome}. Infelizmente não conseguimos confirmar sua solicitação para <strong>${datas}</strong> dessa vez.</p>
+                            <p>Se quiser tentar outra data, é só acessar o site de novo ou chamar no telefone ${CONFIG.telefone}.</p>`
+                     }
+                   </div>`,
+          });
+        } catch (erroEmail) {
+          console.error("Falha ao avisar cliente por e-mail:", erroEmail);
+        }
+      }
+    }
 
     return { ok: true, acao: payload.status };
   });

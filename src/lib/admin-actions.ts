@@ -3,6 +3,8 @@ import { getCookie, setCookie, deleteCookie } from "@tanstack/react-start/server
 import { createClient } from "@supabase/supabase-js";
 import { createHmac, timingSafeEqual, randomBytes, scryptSync } from "node:crypto";
 import { z } from "zod";
+import { Resend } from "resend";
+import { CONFIG, formatarData } from "@/lib/reservas";
 
 // ---------------------------------------------------------------------------
 // Tudo neste arquivo roda SÓ no servidor — nunca é enviado ao navegador.
@@ -141,6 +143,53 @@ async function conferirSenhaAdmin(senha: string): Promise<boolean> {
 }
 
 /**
+ * Avisa o cliente por e-mail quando a reserva dele é aprovada ou
+ * recusada (só manda se ele tiver preenchido e-mail no formulário).
+ * Falha silenciosa: se o e-mail não sair, não trava a ação do admin.
+ */
+async function avisarClientePorEmail(
+  linhas: { email: string | null; nome: string; data: string; valor: number; horario: string }[],
+  status: "aprovada" | "recusada",
+) {
+  const comEmail = linhas.filter((l): l is typeof l & { email: string } => !!l.email);
+  if (comEmail.length === 0) return;
+
+  const chave = process.env.RESEND_API_KEY;
+  if (!chave) return;
+
+  const { email, nome, horario } = comEmail[0];
+  const datas = comEmail.map((l) => formatarData(l.data)).join(", ");
+  const valorTotal = comEmail.reduce((soma, l) => soma + l.valor, 0);
+
+  const aprovada = status === "aprovada";
+  const assunto = aprovada
+    ? `Sua reserva no ${CONFIG.nome} foi aprovada!`
+    : `Sobre sua solicitação no ${CONFIG.nome}`;
+
+  const corpo = aprovada
+    ? `<p>Boa notícia, ${nome}! Sua reserva para <strong>${datas}</strong> (${horario}) foi <strong>aprovada</strong>.</p>
+       <p>Valor combinado: R$ ${valorTotal}. Pagamento: ${CONFIG.pagamento}.</p>
+       <p>Qualquer dúvida, chama no telefone ${CONFIG.telefone}.</p>`
+    : `<p>Olá, ${nome}. Infelizmente não conseguimos confirmar sua solicitação para <strong>${datas}</strong> dessa vez.</p>
+       <p>Se quiser tentar outra data, é só acessar o site de novo ou chamar no telefone ${CONFIG.telefone}.</p>`;
+
+  try {
+    const resend = new Resend(chave);
+    await resend.emails.send({
+      from: `${CONFIG.nome} <reservas@recantodapiscina.com.br>`,
+      to: email,
+      subject: assunto,
+      html: `<div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+               <h2 style="color: #0C4137;">${CONFIG.nome}</h2>
+               ${corpo}
+             </div>`,
+    });
+  } catch (erro) {
+    console.error("Falha ao avisar cliente por e-mail:", erro);
+  }
+}
+
+/**
  * Traduz o erro de "duas reservas aprovadas na mesma data" (bloqueado
  * por uma trava no próprio banco) numa mensagem que faz sentido pro
  * admin entender, em vez de um erro técnico do Postgres.
@@ -253,8 +302,19 @@ export const atualizarReservaAdmin = createServerFn({ method: "POST" })
   .validator(AtualizarReservaSchema)
   .handler(async ({ data }) => {
     exigirSessaoValida();
-    const { error } = await supabaseAdmin().from("reservas").update(data.mudanca).eq("id", data.id);
+    const client = supabaseAdmin();
+    const { error } = await client.from("reservas").update(data.mudanca).eq("id", data.id);
     if (error) traduzirErroBanco(error);
+
+    if (data.mudanca.status === "aprovada" || data.mudanca.status === "recusada") {
+      const { data: linha } = await client
+        .from("reservas")
+        .select("email, nome, data, valor, horario")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (linha) await avisarClientePorEmail([linha], data.mudanca.status);
+    }
+
     return { ok: true };
   });
 
@@ -267,8 +327,18 @@ export const atualizarVariasReservasAdmin = createServerFn({ method: "POST" })
   .validator(AtualizarVariasSchema)
   .handler(async ({ data }) => {
     exigirSessaoValida();
-    const { error } = await supabaseAdmin().from("reservas").update(data.mudanca).in("id", data.ids);
+    const client = supabaseAdmin();
+    const { error } = await client.from("reservas").update(data.mudanca).in("id", data.ids);
     if (error) traduzirErroBanco(error);
+
+    if (data.mudanca.status === "aprovada" || data.mudanca.status === "recusada") {
+      const { data: linhas } = await client
+        .from("reservas")
+        .select("email, nome, data, valor, horario")
+        .in("id", data.ids);
+      if (linhas) await avisarClientePorEmail(linhas, data.mudanca.status);
+    }
+
     return { ok: true };
   });
 

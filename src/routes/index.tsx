@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, MessageCircle, Phone } from "lucide-react";
+import { MapPin, MessageCircle, Phone, Share2 } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
 import { criarSolicitacaoServidor } from "@/lib/email-actions";
@@ -154,6 +154,22 @@ function Home() {
     });
   }
 
+  async function compartilhar() {
+    const texto = `Dá uma olhada no ${CONFIG.nome} em ${CONFIG.cidade}! Reserve sua data:`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: CONFIG.nome, text: texto, url: CONFIG.urlBase });
+      } catch {
+        // usuário cancelou o compartilhamento, sem problema
+      }
+    } else {
+      window.open(
+        `https://wa.me/?text=${encodeURIComponent(`${texto} ${CONFIG.urlBase}`)}`,
+        "_blank",
+      );
+    }
+  }
+
   const valorTotal = datasEscolhidas.length * config.valorDiaria;
 
   async function enviar(e: React.FormEvent) {
@@ -284,6 +300,14 @@ function Home() {
                 <MessageCircle className="h-4 w-4" />
                 WhatsApp
               </a>
+              <button
+                type="button"
+                onClick={compartilhar}
+                className="inline-flex items-center gap-2 rounded-full border border-white/50 px-7 py-3 text-sm font-medium text-white transition hover:bg-white/10"
+              >
+                <Share2 className="h-4 w-4" />
+                Compartilhar
+              </button>
             </div>
           </div>
         </div>
