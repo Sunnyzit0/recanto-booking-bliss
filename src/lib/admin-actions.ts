@@ -443,6 +443,79 @@ export const trocarSenhaAdmin = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// --- Recuperação de senha (esqueci a senha) ---
+// Manda um link por e-mail pro endereço já cadastrado no painel — não
+// precisa digitar e-mail nenhum, já que só existe um admin.
+
+const VALIDADE_TOKEN_RECUPERACAO_MS = 1000 * 60 * 30; // 30 minutos
+
+function assinarTokenRecuperacao(expiraEm: number): string {
+  return createHmac("sha256", segredoSessao()).update(`recuperar-senha:${expiraEm}`).digest("hex");
+}
+
+function tokenRecuperacaoValido(token: string): boolean {
+  const [expiraStr, assinatura] = token.split(".");
+  const expiraEm = Number(expiraStr);
+  if (!expiraEm || Date.now() > expiraEm || !assinatura) return false;
+  const esperada = assinarTokenRecuperacao(expiraEm);
+  const bufA = Buffer.from(assinatura, "hex");
+  const bufB = Buffer.from(esperada, "hex");
+  if (bufA.length !== bufB.length) return false;
+  return timingSafeEqual(bufA, bufB);
+}
+
+export const solicitarRecuperacaoSenha = createServerFn({ method: "POST" }).handler(async () => {
+  const { data } = await supabaseAdmin()
+    .from("configuracoes")
+    .select("valor")
+    .eq("chave", "email_admin")
+    .maybeSingle();
+
+  const emailAdmin = data?.valor;
+  if (!emailAdmin) return { ok: true };
+
+  const chaveResend = process.env.RESEND_API_KEY;
+  if (!chaveResend) return { ok: true };
+
+  const expiraEm = Date.now() + VALIDADE_TOKEN_RECUPERACAO_MS;
+  const token = `${expiraEm}.${assinarTokenRecuperacao(expiraEm)}`;
+  const link = `${CONFIG.urlBase}/redefinir-senha?token=${token}`;
+
+  try {
+    await new Resend(chaveResend).emails.send({
+      from: `${CONFIG.nome} <reservas@recantodapiscina.com.br>`,
+      to: emailAdmin,
+      subject: "Redefinir sua senha do painel",
+      html: `<div style="font-family: sans-serif; max-width: 480px; margin: 0 auto;">
+               <h2 style="color: #0C4137;">${CONFIG.nome}</h2>
+               <p>Recebemos um pedido pra redefinir a senha do painel administrativo.</p>
+               <p><a href="${link}" style="background: #06D6A0; color: #0C4137; padding: 12px 24px; border-radius: 999px; text-decoration: none; font-weight: bold;">Criar nova senha</a></p>
+               <p style="color: #888; font-size: 12px;">Esse link vale por 30 minutos. Se você não pediu isso, pode ignorar este e-mail.</p>
+             </div>`,
+    });
+  } catch (erro) {
+    console.error("Falha ao enviar e-mail de recuperação:", erro);
+  }
+
+  return { ok: true };
+});
+
+export const redefinirSenhaComToken = createServerFn({ method: "POST" })
+  .validator(z.object({ token: z.string().min(10), novaSenha: z.string().min(6).max(200) }))
+  .handler(async ({ data }) => {
+    if (!tokenRecuperacaoValido(data.token)) {
+      return { ok: false, erro: "Link inválido ou expirado. Peça um novo." };
+    }
+
+    const novoHash = gerarHashSenha(data.novaSenha);
+    const { error } = await supabaseAdmin()
+      .from("configuracoes")
+      .upsert({ chave: "admin_senha_hash", valor: novoHash });
+    if (error) throw new Error(error.message);
+
+    return { ok: true };
+  });
+
 // --- Configurações editáveis do site (preço, capacidade, horário) ---
 
 const ConfigSiteSchema = z.object({

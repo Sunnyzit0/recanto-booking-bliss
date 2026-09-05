@@ -18,6 +18,7 @@ import {
   sairAdmin,
   salvarConfigSiteAdmin,
   salvarEmailAdmin,
+  solicitarRecuperacaoSenha,
   trocarSenhaAdmin,
   verificarSessaoAdmin,
 } from "@/lib/admin-actions";
@@ -53,6 +54,8 @@ function Admin() {
   const [senha, setSenha] = useState("");
   const [erro, setErro] = useState<string | null>(null);
   const [entrando, setEntrando] = useState(false);
+  const [enviandoRecuperacao, setEnviandoRecuperacao] = useState(false);
+  const [recuperacaoEnviada, setRecuperacaoEnviada] = useState(false);
 
   const [reservas, setReservas] = useState<Reserva[]>([]);
   const [bloqueios, setBloqueios] = useState<string[]>([]);
@@ -109,6 +112,17 @@ function Admin() {
       );
     }
     setEntrando(false);
+  }
+
+  async function pedirRecuperacaoSenha() {
+    setEnviandoRecuperacao(true);
+    setRecuperacaoEnviada(false);
+    try {
+      await solicitarRecuperacaoSenha();
+      setRecuperacaoEnviada(true);
+    } finally {
+      setEnviandoRecuperacao(false);
+    }
   }
 
   async function sair() {
@@ -282,6 +296,19 @@ function Admin() {
           >
             {entrando ? "Entrando..." : "Entrar"}
           </button>
+          <button
+            type="button"
+            onClick={pedirRecuperacaoSenha}
+            disabled={enviandoRecuperacao}
+            className="mt-3 block w-full text-center text-sm text-muted-foreground hover:underline disabled:opacity-60"
+          >
+            {enviandoRecuperacao ? "Enviando..." : "Esqueci minha senha"}
+          </button>
+          {recuperacaoEnviada && (
+            <p className="mt-2 text-center text-sm text-leaf">
+              Se houver um e-mail cadastrado, um link foi enviado pra ele.
+            </p>
+          )}
           <Link to="/" className="mt-4 block text-center text-sm text-muted-foreground hover:underline">
             Voltar ao site
           </Link>

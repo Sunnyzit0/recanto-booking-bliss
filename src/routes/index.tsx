@@ -514,6 +514,10 @@ function Home() {
               <p className="text-xs text-muted-foreground">
                 Pagamento: {CONFIG.pagamento}. {CONFIG.cancelamento}
               </p>
+              <p className="text-xs text-muted-foreground">
+                Seus dados (nome, telefone e e-mail) são usados só pra confirmar sua reserva e não
+                são compartilhados com terceiros.
+              </p>
             </form>
           </div>
 
