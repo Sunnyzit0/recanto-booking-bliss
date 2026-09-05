@@ -146,7 +146,7 @@ export async function lerConfigPublica(): Promise<ConfigPublica> {
 
 export function janelaDeReserva(): { min: string; max: string } {
   const hoje = new Date();
-  const inicio = new Date(hoje.getFullYear(), hoje.getMonth() + 1, 1);
+  const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
   const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 7, 0);
   return { min: toISO(inicio), max: toISO(fim) };
 }

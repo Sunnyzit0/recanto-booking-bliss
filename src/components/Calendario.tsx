@@ -52,6 +52,8 @@ export function Calendario({
 
   const primeiroDiaProximoMes = toISO(new Date(ano, mes + 1, 1));
   const naoPodeAvancar = !modoAdmin && !!dataMaxima && primeiroDiaProximoMes > dataMaxima;
+  const primeiroDiaMesAtual = toISO(new Date(ano, mes, 1));
+  const naoPodeVoltar = !modoAdmin && !!dataMinima && primeiroDiaMesAtual <= dataMinima;
 
   function estadoDoDia(iso: string): Estado {
     if (reservadas.has(iso)) return "reservada";
@@ -84,7 +86,8 @@ export function Calendario({
         <button
           type="button"
           onClick={() => mudarMes(-1)}
-          className="rounded-full px-3 py-1 text-lg text-muted-foreground transition hover:bg-secondary"
+          disabled={naoPodeVoltar}
+          className="rounded-full px-3 py-1 text-lg text-muted-foreground transition hover:bg-secondary disabled:opacity-30"
           aria-label="Mês anterior"
         >
           ‹
