@@ -118,6 +118,10 @@ function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="pt-BR">
       <head>
+        {/* Roda antes do CSS/hidratação pra evitar flash do tema claro
+            quando o tema escuro foi salvo — precisa vir antes do
+            HeadContent (que inclui a stylesheet). */}
+        <script src="/tema-inicial.js" />
         <HeadContent />
       </head>
       <body>
