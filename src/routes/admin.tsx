@@ -72,6 +72,8 @@ function Admin() {
   const [configSite, setConfigSite] = useState({ valorDiaria: 600, capacidade: "", horario: "" });
   const [salvandoConfig, setSalvandoConfig] = useState(false);
   const [configSalva, setConfigSalva] = useState(false);
+  const [senhaConfig, setSenhaConfig] = useState("");
+  const [erroConfig, setErroConfig] = useState<string | null>(null);
 
   const [senhaAtual, setSenhaAtual] = useState("");
   const [novaSenha, setNovaSenha] = useState("");
@@ -176,9 +178,15 @@ function Admin() {
     e.preventDefault();
     setSalvandoConfig(true);
     setConfigSalva(false);
+    setErroConfig(null);
     try {
-      await salvarConfigSiteAdmin({ data: configSite });
-      setConfigSalva(true);
+      const resultado = await salvarConfigSiteAdmin({ data: { ...configSite, senhaAtual: senhaConfig } });
+      if (resultado.ok) {
+        setConfigSalva(true);
+        setSenhaConfig("");
+      } else {
+        setErroConfig(resultado.erro ?? "Não foi possível salvar.");
+      }
     } finally {
       setSalvandoConfig(false);
     }
@@ -424,6 +432,21 @@ function Admin() {
               className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
             />
           </label>
+          <label className="text-xs text-muted-foreground sm:col-span-3">
+            Confirme sua senha pra salvar
+            <input
+              type="password"
+              value={senhaConfig}
+              onChange={(e) => {
+                setSenhaConfig(e.target.value);
+                setErroConfig(null);
+              }}
+              placeholder="Senha atual"
+              autoComplete="current-password"
+              required
+              className="mt-1 w-full max-w-xs rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
           <div className="sm:col-span-3">
             <button
               type="submit"
@@ -433,6 +456,7 @@ function Admin() {
               {salvandoConfig ? "Salvando..." : "Salvar"}
             </button>
             {configSalva && <span className="ml-3 text-sm text-leaf">Salvo com sucesso.</span>}
+            {erroConfig && <p className="mt-2 text-sm text-destructive">{erroConfig}</p>}
           </div>
         </form>
       </section>

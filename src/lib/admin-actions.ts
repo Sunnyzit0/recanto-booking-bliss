@@ -449,6 +449,10 @@ const ConfigSiteSchema = z.object({
   valorDiaria: z.number().positive().max(100000),
   capacidade: z.string().min(1).max(100),
   horario: z.string().min(1).max(100),
+  // Exige a senha de novo mesmo com sessão válida — a sessão dura 30
+  // dias, então isso evita que uma sessão esquecida aberta (ou um
+  // cookie roubado) altere preço/config sem confirmar quem está mexendo.
+  senhaAtual: z.string().min(1),
 });
 
 export const obterConfigSiteAdmin = createServerFn({ method: "GET" }).handler(async () => {
@@ -471,6 +475,12 @@ export const salvarConfigSiteAdmin = createServerFn({ method: "POST" })
   .validator(ConfigSiteSchema)
   .handler(async ({ data }) => {
     exigirSessaoValida();
+
+    const senhaCorreta = await conferirSenhaAdmin(data.senhaAtual);
+    if (!senhaCorreta) {
+      return { ok: false, erro: "Senha atual incorreta." };
+    }
+
     const { error } = await supabaseAdmin().from("configuracoes").upsert([
       { chave: "valor_diaria", valor: String(data.valorDiaria) },
       { chave: "capacidade", valor: data.capacidade },
