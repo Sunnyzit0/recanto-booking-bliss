@@ -10,7 +10,7 @@ export const CONFIG = {
   whatsapp: "5561998834734",
   cidade: "Padre Bernardo - GO, Setor Leste",
   endereco: "Rua 41, Lote 03, Setor Leste",
-  coordenadas: { lat: -15.175286159058848, lng: -48.26782278485659 },
+  coordenadas: { lat: -15.175238575576874, lng: -48.26782284958184 },
   linkGoogleMaps:
     "https://www.google.com/maps/search/?api=1&query=" +
     encodeURIComponent("Rua 41, Lote 03, Setor Leste, Padre Bernardo, GO"),

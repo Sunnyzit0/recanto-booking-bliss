@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Clock, Coins, Instagram, MapPin, MessageCircle, Phone, Play, Share2, Wallet } from "lucide-react";
+import { Clock, Coins, Instagram, MapPin, MessageCircle, Phone, Play, Share2, Wallet, X } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
 import { CaptchaTurnstile, type CaptchaTurnstileHandle } from "@/components/CaptchaTurnstile";
@@ -135,6 +135,52 @@ function VideoApresentacao() {
   );
 }
 
+function Lightbox({
+  imagem,
+  onFechar,
+}: {
+  imagem: { src: string; alt: string };
+  onFechar: () => void;
+}) {
+  const [visivel, setVisivel] = useState(false);
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => setVisivel(true));
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  function fecharComAnimacao() {
+    setVisivel(false);
+    setTimeout(onFechar, 200);
+  }
+
+  return (
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 transition-opacity duration-200 ${
+        visivel ? "opacity-100" : "opacity-0"
+      }`}
+      onClick={fecharComAnimacao}
+    >
+      <button
+        type="button"
+        onClick={fecharComAnimacao}
+        aria-label="Fechar"
+        className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+      >
+        <X className="h-5 w-5" />
+      </button>
+      <img
+        src={imagem.src}
+        alt={imagem.alt}
+        onClick={(e) => e.stopPropagation()}
+        className={`max-h-[85vh] max-w-[90vw] rounded-2xl object-contain shadow-2xl transition duration-200 ${
+          visivel ? "scale-100 opacity-100" : "scale-90 opacity-0"
+        }`}
+      />
+    </div>
+  );
+}
+
 function Home() {
   const [datasOcupadas, setDatasOcupadas] = useState<string[]>([]);
   const [datasPendentes, setDatasPendentes] = useState<string[]>([]);
@@ -152,7 +198,7 @@ function Home() {
   const [erroConexao, setErroConexao] = useState(false);
   const [reservasAbertas, setReservasAbertas] = useState(true);
   const [config, setConfig] = useState({ valorDiaria: 600, capacidade: "até 40 pessoas", horario: "das 8h às 20h" });
-  const [logoAmpliada, setLogoAmpliada] = useState(false);
+  const [imagemAmpliada, setImagemAmpliada] = useState<{ src: string; alt: string } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const captchaRef = useRef<CaptchaTurnstileHandle>(null);
   const captchaAtivo = Boolean(import.meta.env.VITE_TURNSTILE_SITE_KEY);
@@ -294,7 +340,7 @@ function Home() {
           <div className="flex items-center gap-3">
             <button
               type="button"
-              onClick={() => setLogoAmpliada(true)}
+              onClick={() => setImagemAmpliada({ src: logo, alt: "Logo Recanto da Piscina" })}
               aria-label="Ver logo ampliada"
               className="rounded-full ring-2 ring-border transition hover:opacity-80"
             >
@@ -420,14 +466,20 @@ function Home() {
         <h2 className="font-display text-3xl font-semibold text-foreground">O espaço</h2>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {FOTOS.map((f) => (
-            <div key={f.src} className="overflow-hidden rounded-2xl">
+            <button
+              key={f.src}
+              type="button"
+              onClick={() => setImagemAmpliada({ src: f.src, alt: f.alt })}
+              className="overflow-hidden rounded-2xl"
+              aria-label={`Ampliar foto: ${f.alt}`}
+            >
               <img
                 src={f.src}
                 alt={f.alt}
                 loading="lazy"
-                className="h-64 w-full object-cover transition duration-500 hover:scale-105"
+                className="h-64 w-full cursor-zoom-in object-cover transition duration-500 hover:scale-105"
               />
-            </div>
+            </button>
           ))}
         </div>
       </section>
@@ -693,17 +745,8 @@ function Home() {
 
       <p className="pb-8 text-center text-sm italic text-muted-foreground">Vem aí novidades...</p>
 
-      {logoAmpliada && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4"
-          onClick={() => setLogoAmpliada(false)}
-        >
-          <img
-            src={logo}
-            alt="Logo Recanto da Piscina ampliada"
-            className="max-h-[80vh] max-w-[80vw] rounded-2xl object-contain"
-          />
-        </div>
+      {imagemAmpliada && (
+        <Lightbox imagem={imagemAmpliada} onFechar={() => setImagemAmpliada(null)} />
       )}
     </main>
   );
