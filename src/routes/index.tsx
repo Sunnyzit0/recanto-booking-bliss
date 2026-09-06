@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { Clock, Coins, Instagram, MapPin, MessageCircle, Phone, Share2, Wallet } from "lucide-react";
+import { Clock, Coins, Instagram, MapPin, MessageCircle, Phone, Play, Share2, Wallet } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
 import { CaptchaTurnstile, type CaptchaTurnstileHandle } from "@/components/CaptchaTurnstile";
@@ -92,6 +92,48 @@ const FOTOS = [
   { src: fotoGourmet, alt: "Área gourmet com churrasqueira de alvenaria e cooktop" },
   { src: fotoNoite, alt: "Piscina iluminada à noite" },
 ];
+
+function VideoApresentacao() {
+  const [tocando, setTocando] = useState(false);
+  const [videoVisivel, setVideoVisivel] = useState(false);
+
+  function iniciar() {
+    setTocando(true);
+    requestAnimationFrame(() => setVideoVisivel(true));
+  }
+
+  return (
+    <div className="relative mx-auto aspect-[9/16] w-full max-w-sm overflow-hidden rounded-2xl shadow-soft">
+      {!tocando && (
+        <button
+          type="button"
+          onClick={iniciar}
+          aria-label="Reproduzir vídeo"
+          className="group absolute inset-0 h-full w-full"
+        >
+          <img src={capaVideo} alt="Prévia do vídeo do espaço" className="h-full w-full object-cover" />
+          <span className="absolute inset-0 flex items-center justify-center bg-black/30 transition group-hover:bg-black/40">
+            <span className="flex h-16 w-16 items-center justify-center rounded-full bg-white/90 shadow-lg transition group-hover:scale-110">
+              <Play className="h-7 w-7 translate-x-0.5 text-[#0C4137]" fill="#0C4137" />
+            </span>
+          </span>
+        </button>
+      )}
+      {tocando && (
+        <video
+          autoPlay
+          controls
+          playsInline
+          className={`h-full w-full object-cover transition-opacity duration-500 ${
+            videoVisivel ? "opacity-100" : "opacity-0"
+          }`}
+        >
+          <source src={videoApresentacao} type="video/mp4" />
+        </video>
+      )}
+    </div>
+  );
+}
 
 function Home() {
   const [datasOcupadas, setDatasOcupadas] = useState<string[]>([]);
@@ -394,14 +436,7 @@ function Home() {
       <section className="mx-auto max-w-5xl px-4 pb-14">
         <h2 className="font-display text-3xl font-semibold text-foreground">Conheça o espaço em vídeo</h2>
         <div className="mt-6 flex justify-center">
-          <video
-            controls
-            preload="none"
-            poster={capaVideo}
-            className="aspect-[9/16] max-h-[70vh] w-full max-w-sm rounded-2xl object-cover shadow-soft"
-          >
-            <source src={videoApresentacao} type="video/mp4" />
-          </video>
+          <VideoApresentacao />
         </div>
       </section>
 
