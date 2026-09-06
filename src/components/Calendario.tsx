@@ -118,13 +118,14 @@ export function Calendario({
           const dia = i + 1;
           const iso = toISO(new Date(ano, mes, dia));
           const passado = iso < hojeISO;
+          const antesDeAmanha = iso <= hojeISO;
           const estado = estadoDoDia(iso);
           const foraDaJanela =
             !modoAdmin &&
             ((dataMinima && iso < dataMinima) || (dataMaxima && iso > dataMaxima));
           const desabilitada = modoAdmin
             ? passado
-            : passado || estado !== "disponivel" || foraDaJanela;
+            : antesDeAmanha || estado !== "disponivel" || foraDaJanela;
           const ativa = selecionadas?.has(iso) ?? false;
 
           return (
