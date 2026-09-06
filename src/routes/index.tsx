@@ -243,10 +243,12 @@ function Home() {
 
   useEffect(() => {
     carregar();
-    // Bloqueios manuais atualizam na hora; reservas aprovadas por novos
-    // clientes aparecem em até 1 minuto (não exigem login pra consultar).
+    // Bloqueios manuais atualizam na hora; reservas/pendências de
+    // outros clientes aparecem em até 8 segundos (não exigem login
+    // pra consultar). Isso, junto com a trava no banco de dados,
+    // evita duas pessoas conseguirem deixar pendente a mesma data.
     const parar = escutarBloqueios(() => carregar());
-    const intervalo = setInterval(carregar, 60_000);
+    const intervalo = setInterval(carregar, 8_000);
     return () => {
       parar();
       clearInterval(intervalo);
@@ -333,6 +335,7 @@ function Home() {
       setTelefone("");
       setEmail("");
       setDatasEscolhidas([]);
+      carregar(); // atualiza o calendário na hora, sem esperar o próximo ciclo
     } catch (erro) {
       console.error(erro);
       setErroEnvio("Não foi possível enviar sua solicitação. Tente novamente ou chame no WhatsApp.");

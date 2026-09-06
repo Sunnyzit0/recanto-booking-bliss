@@ -195,14 +195,14 @@ async function avisarClientePorEmail(
 }
 
 /**
- * Traduz o erro de "duas reservas aprovadas na mesma data" (bloqueado
- * por uma trava no próprio banco) numa mensagem que faz sentido pro
- * admin entender, em vez de um erro técnico do Postgres.
+ * Traduz o erro de "já existe reserva pendente/aprovada nessa data"
+ * (bloqueado por travas no próprio banco) numa mensagem que faz
+ * sentido pra quem estiver vendo, em vez de um erro técnico do Postgres.
  */
 export function traduzirErroBanco(error: { code?: string; message: string }): never {
   if (error.code === "23505") {
     throw new Error(
-      "Já existe uma reserva aprovada para uma dessas datas. Recuse ou mude a data antes de aprovar.",
+      "Já existe uma solicitação (pendente ou aprovada) para uma dessas datas. Escolha outra data ou decida sobre a solicitação existente antes.",
     );
   }
   throw new Error(error.message);
