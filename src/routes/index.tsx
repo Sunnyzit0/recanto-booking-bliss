@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, MessageCircle, Phone, Share2 } from "lucide-react";
+import { MapPin, MessageCircle, Phone, Share2, Wallet } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
 import { CaptchaTurnstile, type CaptchaTurnstileHandle } from "@/components/CaptchaTurnstile";
@@ -511,9 +511,11 @@ function Home() {
                 </p>
               )}
 
-              <p className="text-xs text-muted-foreground">
-                Pagamento: {CONFIG.pagamento}. {CONFIG.cancelamento}
+              <p className="inline-flex items-center gap-2 rounded-lg bg-accent px-3 py-2 text-sm font-semibold text-accent-foreground">
+                <Wallet className="h-4 w-4" />
+                Pagamento: {CONFIG.pagamento}
               </p>
+              <p className="text-xs text-muted-foreground">{CONFIG.cancelamento}</p>
               <p className="text-xs text-muted-foreground">
                 Seus dados (nome, telefone e e-mail) são usados só pra confirmar sua reserva e não
                 são compartilhados com terceiros.
