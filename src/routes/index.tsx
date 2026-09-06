@@ -398,7 +398,7 @@ function Home() {
             controls
             preload="none"
             poster={capaVideo}
-            className="max-h-[70vh] w-full max-w-sm rounded-2xl shadow-soft"
+            className="aspect-[9/16] max-h-[70vh] w-full max-w-sm rounded-2xl object-cover shadow-soft"
           >
             <source src={videoApresentacao} type="video/mp4" />
           </video>
