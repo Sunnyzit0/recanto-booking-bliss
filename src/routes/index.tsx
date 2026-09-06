@@ -348,7 +348,10 @@ function Home() {
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {DIFERENCIAIS.map((d) => (
-            <div key={d.titulo} className="shadow-soft rounded-2xl border border-border bg-card p-5">
+            <div
+              key={d.titulo}
+              className="shadow-soft rounded-2xl border border-border bg-card p-5 transition duration-300 hover:-translate-y-1 hover:shadow-lg"
+            >
               <h3 className="font-display text-xl text-foreground">{d.titulo}</h3>
               <p className="mt-2 text-sm text-muted-foreground">{d.texto}</p>
             </div>
@@ -356,18 +359,31 @@ function Home() {
         </div>
       </section>
 
+      {/* Onda decorativa repetindo o motivo da logo, marcando a transição
+          pra galeria de fotos */}
+      <div className="relative h-10 overflow-hidden sm:h-14">
+        <svg
+          viewBox="0 0 1440 60"
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full text-secondary/60"
+        >
+          <path fill="currentColor" d="M0,20 C240,50 480,0 720,16 C960,32 1200,55 1440,25 L1440,60 L0,60 Z" />
+        </svg>
+      </div>
+
       {/* Fotos */}
       <section className="mx-auto max-w-5xl px-4 pb-14">
         <h2 className="font-display text-3xl text-foreground">O espaço</h2>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
           {FOTOS.map((f) => (
-            <img
-              key={f.src}
-              src={f.src}
-              alt={f.alt}
-              loading="lazy"
-              className="h-64 w-full rounded-2xl object-cover"
-            />
+            <div key={f.src} className="overflow-hidden rounded-2xl">
+              <img
+                src={f.src}
+                alt={f.alt}
+                loading="lazy"
+                className="h-64 w-full object-cover transition duration-500 hover:scale-105"
+              />
+            </div>
           ))}
         </div>
       </section>
@@ -531,6 +547,17 @@ function Home() {
         </div>
       </section>
 
+      {/* Onda decorativa marcando a transição pro rodapé */}
+      <div className="relative h-10 overflow-hidden sm:h-14">
+        <svg
+          viewBox="0 0 1440 60"
+          preserveAspectRatio="none"
+          className="absolute inset-0 h-full w-full text-secondary/60"
+        >
+          <path fill="currentColor" d="M0,35 C240,5 480,55 720,30 C960,8 1200,45 1440,20 L1440,0 L0,0 Z" />
+        </svg>
+      </div>
+
       {/* Contato */}
       <footer className="mx-auto max-w-5xl px-4 py-14">
         <h2 className="font-display text-3xl text-foreground">Onde estamos</h2>
@@ -586,7 +613,7 @@ function Home() {
       </footer>
 
       {CONFIG.regras.length > 0 && (
-        <section className="mx-auto max-w-5xl px-4 py-10">
+        <section className="mx-auto max-w-5xl px-4 py-14">
           <h2 className="font-display text-2xl text-foreground">Regras do espaço</h2>
           <ul className="mt-4 list-disc space-y-2 pl-5 text-muted-foreground">
             {CONFIG.regras.map((regra, i) => (
