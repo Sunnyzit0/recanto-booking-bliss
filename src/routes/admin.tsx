@@ -43,9 +43,21 @@ export const Route = createFileRoute("/admin")({
 });
 
 const CORES: Record<Status, string> = {
-  pendente: "bg-accent text-accent-foreground",
-  aprovada: "bg-leaf/15 text-leaf",
-  recusada: "bg-destructive/10 text-destructive",
+  pendente: "bg-orange-200 text-orange-950 dark:bg-orange-600/70 dark:text-orange-50",
+  aprovada: "bg-green-200 text-green-950 dark:bg-green-700/70 dark:text-green-50",
+  recusada: "bg-red-200 text-red-950 dark:bg-red-700/70 dark:text-red-50",
+};
+
+const BORDA_CARD: Record<Status, string> = {
+  pendente: "border-l-4 border-l-orange-400 dark:border-l-orange-500",
+  aprovada: "border-l-4 border-l-green-500 dark:border-l-green-500",
+  recusada: "border-l-4 border-l-red-400 dark:border-l-red-500",
+};
+
+const TITULO_SECAO: Record<Status, string> = {
+  pendente: "🟠 Pendentes",
+  aprovada: "🟢 Aprovadas",
+  recusada: "🔴 Recusadas",
 };
 
 function linkWhatsApp(telefone: string) {
@@ -856,115 +868,144 @@ function Admin() {
             </select>
           </div>
         </div>
-        <div className="mt-4 space-y-4">
+        <div className="mt-4 space-y-6">
           {carregando && <p className="text-sm text-muted-foreground">Carregando reservas...</p>}
           {!carregando && reservas.length === 0 && (
             <p className="text-sm text-muted-foreground">Nenhuma solicitação recebida ainda.</p>
           )}
-          {agruparReservas(
-            reservas.filter(
+          {(() => {
+            const filtradas = reservas.filter(
               (r) =>
                 (filtroStatus === "todas" || r.status === filtroStatus) &&
                 r.nome.toLowerCase().includes(busca.toLowerCase()),
-            ),
-          ).map((grupo) => {
-            const primeira = grupo[0];
-            const ids = grupo.map((r) => r.id);
-            const valorTotal = grupo.reduce((soma, r) => soma + r.valor, 0);
-            return (
-              <div key={ids.join("-")} className="shadow-soft rounded-2xl border border-border bg-card p-5">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
-                    <p className="font-medium text-foreground">{primeira.nome}</p>
-                    <a
-                      href={linkWhatsApp(primeira.telefone)}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="flex items-center gap-1 text-sm text-leaf hover:underline"
-                    >
-                      <MessageCircle className="h-3.5 w-3.5" />
-                      {primeira.telefone}
-                    </a>
-                  </div>
-                  <span className={`rounded-full px-3 py-1 text-xs capitalize ${CORES[primeira.status]}`}>
-                    {primeira.status}
+            );
+            const grupos = agruparReservas(filtradas);
+            const ordem: Status[] = ["pendente", "aprovada", "recusada"];
+            const secoes = ordem
+              .map((status) => ({ status, grupos: grupos.filter((g) => g[0].status === status) }))
+              .filter((s) => s.grupos.length > 0);
+
+            if (!carregando && secoes.length === 0 && reservas.length > 0) {
+              return (
+                <p className="text-sm text-muted-foreground">
+                  Nenhuma solicitação encontrada com esse filtro.
+                </p>
+              );
+            }
+
+            return secoes.map(({ status, grupos: gruposDoStatus }) => (
+              <div key={status}>
+                <h3 className="mb-3 flex items-center gap-2">
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${CORES[status]}`}>
+                    {status} ({gruposDoStatus.length})
                   </span>
-                </div>
+                </h3>
+                <div className="space-y-4">
+                  {gruposDoStatus.map((grupo) => {
+                    const primeira = grupo[0];
+                    const ids = grupo.map((r) => r.id);
+                    const valorTotal = grupo.reduce((soma, r) => soma + r.valor, 0);
+                    return (
+                      <div
+                        key={ids.join("-")}
+                        className={`shadow-soft rounded-2xl border border-border bg-card p-5 ${BORDA_CARD[primeira.status]}`}
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <div>
+                            <p className="font-medium text-foreground">{primeira.nome}</p>
+                            <a
+                              href={linkWhatsApp(primeira.telefone)}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="flex items-center gap-1 text-sm text-leaf hover:underline"
+                            >
+                              <MessageCircle className="h-3.5 w-3.5" />
+                              {primeira.telefone}
+                            </a>
+                          </div>
+                          <span className={`rounded-full px-3 py-1 text-xs capitalize ${CORES[primeira.status]}`}>
+                            {primeira.status}
+                          </span>
+                        </div>
 
-                {grupo.length > 1 && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Pedido com {grupo.length} datas — total de referência R$ {valorTotal} (desconto a
-                    combinar)
-                  </p>
-                )}
+                        {grupo.length > 1 && (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            Pedido com {grupo.length} datas — total de referência R$ {valorTotal} (desconto a
+                            combinar)
+                          </p>
+                        )}
 
-                <div className="mt-4 space-y-3">
-                  {grupo.map((r) => (
-                    <div key={r.id} className="grid gap-3 rounded-xl bg-secondary/40 p-3 sm:grid-cols-3">
-                      <label className="text-xs text-muted-foreground">
-                        Data ({formatarData(r.data)})
-                        <input
-                          type="date"
-                          value={r.data}
-                          onChange={(e) => atualizar(r.id, { data: e.target.value })}
-                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
-                        />
-                      </label>
-                      <label className="text-xs text-muted-foreground">
-                        Valor (R$)
-                        <input
-                          type="number"
-                          value={r.valor}
-                          onChange={(e) => atualizar(r.id, { valor: Number(e.target.value) })}
-                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
-                        />
-                      </label>
-                      <label className="text-xs text-muted-foreground">
-                        Horário
-                        <input
-                          value={r.horario}
-                          onChange={(e) => atualizar(r.id, { horario: e.target.value })}
-                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
-                        />
-                      </label>
-                      <label className="text-xs text-muted-foreground sm:col-span-3">
-                        Observação
-                        <textarea
-                          value={r.observacao ?? ""}
-                          onChange={(e) => atualizar(r.id, { observacao: e.target.value })}
-                          placeholder="Ex: cliente confirmou por telefone, pediu 1h a mais..."
-                          rows={2}
-                          className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
-                        />
-                      </label>
-                    </div>
-                  ))}
-                </div>
+                        <div className="mt-4 space-y-3">
+                          {grupo.map((r) => (
+                            <div key={r.id} className="grid gap-3 rounded-xl bg-secondary/40 p-3 sm:grid-cols-3">
+                              <label className="text-xs text-muted-foreground">
+                                Data ({formatarData(r.data)})
+                                <input
+                                  type="date"
+                                  value={r.data}
+                                  onChange={(e) => atualizar(r.id, { data: e.target.value })}
+                                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                                />
+                              </label>
+                              <label className="text-xs text-muted-foreground">
+                                Valor (R$)
+                                <input
+                                  type="number"
+                                  value={r.valor}
+                                  onChange={(e) => atualizar(r.id, { valor: Number(e.target.value) })}
+                                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                                />
+                              </label>
+                              <label className="text-xs text-muted-foreground">
+                                Horário
+                                <input
+                                  value={r.horario}
+                                  onChange={(e) => atualizar(r.id, { horario: e.target.value })}
+                                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                                />
+                              </label>
+                              <label className="text-xs text-muted-foreground sm:col-span-3">
+                                Observação
+                                <textarea
+                                  value={r.observacao ?? ""}
+                                  onChange={(e) => atualizar(r.id, { observacao: e.target.value })}
+                                  placeholder="Ex: cliente confirmou por telefone, pediu 1h a mais..."
+                                  rows={2}
+                                  className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                                />
+                              </label>
+                            </div>
+                          ))}
+                        </div>
 
-                <div className="mt-4 flex flex-wrap gap-3">
-                  <button
-                    onClick={() => atualizarGrupo(ids, { status: "aprovada" })}
-                    className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
-                  >
-                    {grupo.length > 1 ? "Aprovar todas" : "Aprovar"}
-                  </button>
-                  <button
-                    onClick={() => atualizarGrupo(ids, { status: "recusada" })}
-                    className="rounded-full border border-input px-5 py-2 text-sm text-foreground transition hover:bg-secondary"
-                  >
-                    {grupo.length > 1 ? "Recusar todas" : "Recusar"}
-                  </button>
-                  <button
-                    onClick={() => excluirGrupo(ids)}
-                    disabled={ids.some((id) => excluindoIds.includes(id))}
-                    className="rounded-full border border-destructive/40 px-5 py-2 text-sm text-destructive transition hover:bg-destructive/10 disabled:opacity-60"
-                  >
-                    {ids.some((id) => excluindoIds.includes(id)) ? "Excluindo..." : "Excluir"}
-                  </button>
+                        <div className="mt-4 flex flex-wrap gap-3">
+                          <button
+                            onClick={() => atualizarGrupo(ids, { status: "aprovada" })}
+                            className="rounded-full bg-primary px-5 py-2 text-sm text-primary-foreground transition hover:opacity-90"
+                          >
+                            {grupo.length > 1 ? "Aprovar todas" : "Aprovar"}
+                          </button>
+                          <button
+                            onClick={() => atualizarGrupo(ids, { status: "recusada" })}
+                            className="rounded-full border border-input px-5 py-2 text-sm text-foreground transition hover:bg-secondary"
+                          >
+                            {grupo.length > 1 ? "Recusar todas" : "Recusar"}
+                          </button>
+                          <button
+                            onClick={() => excluirGrupo(ids)}
+                            disabled={ids.some((id) => excluindoIds.includes(id))}
+                            className="rounded-full border border-destructive/40 px-5 py-2 text-sm text-destructive transition hover:bg-destructive/10 disabled:opacity-60"
+                          >
+                            {ids.some((id) => excluindoIds.includes(id)) ? "Excluindo..." : "Excluir"}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
-            );
-          })}
+            ));
+          })()}
         </div>
       </section>
 
