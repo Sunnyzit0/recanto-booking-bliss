@@ -228,7 +228,12 @@ function Home() {
       setDatasPendentes(novasPendentes);
       setBloqueios(novosBloqueios);
       setReservasAbertas(abertas);
-      setConfig(configPublica);
+      setConfig({
+        ...configPublica,
+        // Enquanto ninguém tiver subido foto pelo painel admin, mantém
+        // as fotos originais do site em vez de mostrar a galeria vazia.
+        galeriaFotos: configPublica.galeriaFotos.length > 0 ? configPublica.galeriaFotos : FOTOS,
+      });
       setErroConexao(false);
     } catch (erro) {
       console.error("Falha ao carregar disponibilidade:", erro);
