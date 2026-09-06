@@ -23,6 +23,8 @@ import {
 const URL_BASE = "https://www.recantodapiscina.com.br";
 
 import logo from "@/assets/logo.png";
+import videoApresentacao from "@/assets/recanto-apresentacao.mp4";
+import capaVideo from "@/assets/capa-video.jpg";
 import fotoPiscina from "@/assets/piscina-dia.jpg";
 import fotoArea from "@/assets/piscina-area-externa.jpg";
 import fotoGourmet from "@/assets/area-gourmet-churrasqueira.jpg";
@@ -385,6 +387,21 @@ function Home() {
               />
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Vídeo de apresentação */}
+      <section className="mx-auto max-w-5xl px-4 pb-14">
+        <h2 className="font-display text-3xl font-semibold text-foreground">Conheça o espaço em vídeo</h2>
+        <div className="mt-6 flex justify-center">
+          <video
+            controls
+            preload="none"
+            poster={capaVideo}
+            className="max-h-[70vh] w-full max-w-sm rounded-2xl shadow-soft"
+          >
+            <source src={videoApresentacao} type="video/mp4" />
+          </video>
         </div>
       </section>
 
