@@ -540,7 +540,7 @@ export const obterConfigSiteAdmin = createServerFn({ method: "GET" }).handler(as
   return {
     valorDiaria: Number(mapa.valor_diaria) || 600,
     capacidade: mapa.capacidade || "até 40 pessoas",
-    horario: mapa.horario || "das 8h às 20h (12 horas)",
+    horario: mapa.horario || "das 8h às 20h",
   };
 });
 

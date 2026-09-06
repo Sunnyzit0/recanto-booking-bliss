@@ -14,10 +14,11 @@ export const CONFIG = {
   linkGoogleMaps:
     "https://www.google.com/maps/search/?api=1&query=" +
     encodeURIComponent("Rua 41, Lote 03, Setor Leste, Padre Bernardo, GO"),
+  instagram: "https://www.instagram.com/_recantodapiscina/",
   capacidade: "até 40 pessoas",
   // Ajuste aqui quando comprar o domínio próprio (ex: https://recantodapiscina.com.br)
   urlBase: "https://www.recantodapiscina.com.br",
-  horario: "das 8h às 20h (12 horas)",
+  horario: "das 8h às 20h",
   pagamento: "Pix ou dinheiro",
   cancelamento: "Cancelamento gratuito até 7 dias antes da data reservada.",
   // Regras do espaço — o cliente ainda vai definir o texto. Enquanto
@@ -121,7 +122,7 @@ export type ConfigPublica = { valorDiaria: number; capacidade: string; horario: 
 const CONFIG_PADRAO: ConfigPublica = {
   valorDiaria: 600,
   capacidade: "até 40 pessoas",
-  horario: "das 8h às 20h (12 horas)",
+  horario: "das 8h às 20h",
 };
 
 /**

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { MapPin, MessageCircle, Phone, Share2, Wallet } from "lucide-react";
+import { Clock, Coins, Instagram, MapPin, MessageCircle, Phone, Share2, Wallet } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
 import { CaptchaTurnstile, type CaptchaTurnstileHandle } from "@/components/CaptchaTurnstile";
@@ -107,7 +107,7 @@ function Home() {
   const enviandoRef = useRef(false);
   const [erroConexao, setErroConexao] = useState(false);
   const [reservasAbertas, setReservasAbertas] = useState(true);
-  const [config, setConfig] = useState({ valorDiaria: 600, capacidade: "até 40 pessoas", horario: "das 8h às 20h (12 horas)" });
+  const [config, setConfig] = useState({ valorDiaria: 600, capacidade: "até 40 pessoas", horario: "das 8h às 20h" });
   const [logoAmpliada, setLogoAmpliada] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const captchaRef = useRef<CaptchaTurnstileHandle>(null);
@@ -292,7 +292,7 @@ function Home() {
               {CONFIG.subtitulo}
             </p>
             <p className="mx-auto mt-5 max-w-md text-base text-white/95 sm:text-lg">
-              Um refúgio cercado de verde para reunir a família e celebrar momentos com
+              Um espaço pensado para reunir a família e os amigos, e celebrar momentos com
               tranquilidade.
             </p>
             <div className="mt-8 flex flex-wrap justify-center gap-3">
@@ -340,10 +340,10 @@ function Home() {
       <section className="mx-auto max-w-5xl px-4 py-14">
         <h2 className="font-display text-3xl font-semibold text-foreground">Sobre o espaço</h2>
         <p className="mt-4 max-w-3xl text-muted-foreground">
-          Espaço para alugar por diária, com capacidade para {config.capacidade} (pode passar um
-          pouco disso). O aluguel inclui toda a estrutura: piscina com cascata, churrasqueira,
-          fogão a lenha, área gourmet completa e wi-fi. Ideal para todo tipo de evento e
-          celebração, dos encontros em família às festas maiores.
+          Espaço para alugar por diária, com capacidade para {config.capacidade}. O aluguel inclui
+          toda a estrutura: piscina com cascata, churrasqueira, fogão a lenha, área gourmet
+          completa e wi-fi. Ideal para todo tipo de evento e celebração, dos encontros em família
+          às festas maiores.
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -392,10 +392,17 @@ function Home() {
       <section id="reservar" className="bg-secondary/60 py-14">
         <div className="mx-auto max-w-5xl px-4">
           <h2 className="font-display text-3xl font-semibold text-foreground">Reserve sua data</h2>
-          <p className="mt-2 text-muted-foreground">
-            Diária: <strong>R$ {config.valorDiaria}</strong> ({config.horario}).
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
+          <div className="mt-3 flex flex-wrap gap-3">
+            <span className="inline-flex items-center gap-2 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+              <Coins className="h-4 w-4" />
+              R$ {config.valorDiaria} / diária
+            </span>
+            <span className="inline-flex items-center gap-2 rounded-full bg-secondary px-4 py-2 text-sm font-semibold text-secondary-foreground">
+              <Clock className="h-4 w-4" />
+              {config.horario}
+            </span>
+          </div>
+          <p className="mt-3 text-sm text-muted-foreground">
             Reservas abertas de {formatarData(janela.min)} até {formatarData(janela.max)}. Escolha
             de 1 a {MAX_DATAS} datas — para pacotes de 2 ou mais dias, o desconto é combinado
             diretamente com o dono do espaço.
@@ -589,6 +596,15 @@ function Home() {
               >
                 <MapPin className="h-4 w-4" />
                 Abrir no Google Maps
+              </a>
+              <a
+                href={CONFIG.instagram}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-2 rounded-full border border-input px-6 py-3 text-sm font-medium text-foreground transition hover:bg-secondary"
+              >
+                <Instagram className="h-4 w-4" />
+                Instagram
               </a>
             </div>
           </div>
