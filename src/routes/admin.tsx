@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { AlertTriangle, MessageCircle } from "lucide-react";
+import { AlertTriangle, MessageCircle, Plus, Trash2, Upload } from "lucide-react";
 import { Calendario } from "@/components/Calendario";
 import { BotaoTema } from "@/components/BotaoTema";
 import {
@@ -8,21 +8,26 @@ import {
   atualizarReservaAdmin,
   atualizarVariasReservasAdmin,
   definirStatusReservas,
+  enviarFotoGaleriaAdmin,
+  excluirFotoGaleriaAdmin,
   excluirReservasAdmin,
   listarBloqueiosAdmin,
+  listarFotosGaleriaAdmin,
   listarReservasAdmin,
   loginAdmin,
   obterConfigSiteAdmin,
+  obterConteudoSiteAdmin,
   obterEmailAdmin,
   obterStatusReservas,
   sairAdmin,
   salvarConfigSiteAdmin,
+  salvarConteudoSiteAdmin,
   salvarEmailAdmin,
   solicitarRecuperacaoSenha,
   trocarSenhaAdmin,
   verificarSessaoAdmin,
 } from "@/lib/admin-actions";
-import { formatarData, type Reserva, type Status } from "@/lib/reservas";
+import { formatarData, type Diferencial, type FotoGaleria, type Reserva, type Status } from "@/lib/reservas";
 
 export const Route = createFileRoute("/admin")({
   head: () => ({
@@ -85,6 +90,17 @@ function Admin() {
   const [erroSenha, setErroSenha] = useState<string | null>(null);
   const [senhaTrocada, setSenhaTrocada] = useState(false);
 
+  const [sobreTexto, setSobreTexto] = useState("");
+  const [diferenciais, setDiferenciais] = useState<Diferencial[]>([]);
+  const [regras, setRegras] = useState<string[]>([]);
+  const [salvandoConteudo, setSalvandoConteudo] = useState(false);
+  const [conteudoSalvo, setConteudoSalvo] = useState(false);
+
+  const [fotosGaleria, setFotosGaleria] = useState<FotoGaleria[]>([]);
+  const [enviandoFoto, setEnviandoFoto] = useState(false);
+  const [erroFoto, setErroFoto] = useState<string | null>(null);
+  const [excluindoFoto, setExcluindoFoto] = useState<string | null>(null);
+
   // Verifica se já existe uma sessão válida (cookie assinado no servidor)
   useEffect(() => {
     verificarSessaoAdmin().then(({ logado }) => {
@@ -146,6 +162,12 @@ function Admin() {
     obterEmailAdmin().then((r) => setEmailAdmin(r.email));
     obterStatusReservas().then((r) => setReservasAbertas(r.abertas));
     obterConfigSiteAdmin().then(setConfigSite);
+    obterConteudoSiteAdmin().then((r) => {
+      setSobreTexto(r.sobreTexto);
+      setDiferenciais(r.diferenciais);
+      setRegras(r.regras);
+    });
+    listarFotosGaleriaAdmin().then((r) => setFotosGaleria(r.fotos));
     // Sem login "realtime" do banco aqui — atualiza a cada 20s, e também
     // logo depois de qualquer ação (aprovar, recusar, editar, bloquear).
     const intervalo = setInterval(carregar, 20_000);
@@ -203,6 +225,130 @@ function Admin() {
       }
     } finally {
       setSalvandoConfig(false);
+    }
+  }
+
+  async function salvarConteudo(e: React.FormEvent) {
+    e.preventDefault();
+    setSalvandoConteudo(true);
+    setConteudoSalvo(false);
+    try {
+      await salvarConteudoSiteAdmin({ data: { sobreTexto, diferenciais, regras } });
+      setConteudoSalvo(true);
+    } finally {
+      setSalvandoConteudo(false);
+    }
+  }
+
+  function atualizarDiferencial(indice: number, campo: "titulo" | "texto", valor: string) {
+    setDiferenciais((atual) =>
+      atual.map((d, i) => (i === indice ? { ...d, [campo]: valor } : d)),
+    );
+    setConteudoSalvo(false);
+  }
+
+  function adicionarDiferencial() {
+    setDiferenciais((atual) => [...atual, { titulo: "", texto: "" }]);
+    setConteudoSalvo(false);
+  }
+
+  function removerDiferencial(indice: number) {
+    setDiferenciais((atual) => atual.filter((_, i) => i !== indice));
+    setConteudoSalvo(false);
+  }
+
+  function atualizarRegra(indice: number, valor: string) {
+    setRegras((atual) => atual.map((r, i) => (i === indice ? valor : r)));
+    setConteudoSalvo(false);
+  }
+
+  function adicionarRegra() {
+    setRegras((atual) => [...atual, ""]);
+    setConteudoSalvo(false);
+  }
+
+  function removerRegra(indice: number) {
+    setRegras((atual) => atual.filter((_, i) => i !== indice));
+    setConteudoSalvo(false);
+  }
+
+  function arquivoParaBase64(arquivo: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const leitor = new FileReader();
+      leitor.onload = () => resolve((leitor.result as string).split(",")[1]);
+      leitor.onerror = reject;
+      leitor.readAsDataURL(arquivo);
+    });
+  }
+
+  /** Redimensiona/comprime a imagem no navegador antes de enviar, pra
+   * não sobrecarregar o upload com fotos gigantes de celular. */
+  function comprimirImagem(arquivo: File, ladoMaximo = 1600, qualidade = 0.82): Promise<File> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(arquivo);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        const escala = Math.min(1, ladoMaximo / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * escala);
+        canvas.height = Math.round(img.height * escala);
+        const ctx = canvas.getContext("2d");
+        if (!ctx) return reject(new Error("Canvas indisponível"));
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob) return reject(new Error("Falha ao comprimir imagem"));
+            resolve(new File([blob], arquivo.name, { type: "image/jpeg" }));
+          },
+          "image/jpeg",
+          qualidade,
+        );
+      };
+      img.onerror = reject;
+      img.src = url;
+    });
+  }
+
+  async function enviarFoto(e: React.ChangeEvent<HTMLInputElement>) {
+    const arquivo = e.target.files?.[0];
+    e.target.value = "";
+    if (!arquivo) return;
+
+    setErroFoto(null);
+    setEnviandoFoto(true);
+    try {
+      const comprimido = await comprimirImagem(arquivo);
+      const dadosBase64 = await arquivoParaBase64(comprimido);
+      const resultado = await enviarFotoGaleriaAdmin({
+        data: {
+          nomeArquivo: comprimido.name,
+          tipoMime: "image/jpeg",
+          dadosBase64,
+          alt: "Foto do Recanto da Piscina",
+        },
+      });
+      if (resultado.ok) {
+        setFotosGaleria(resultado.fotos);
+      } else {
+        setErroFoto(resultado.erro ?? "Não foi possível enviar a foto.");
+      }
+    } catch {
+      setErroFoto("Não foi possível processar essa imagem.");
+    } finally {
+      setEnviandoFoto(false);
+    }
+  }
+
+  async function excluirFoto(caminho: string | undefined) {
+    if (!caminho) return;
+    if (!confirm("Excluir essa foto da galeria?")) return;
+    setExcluindoFoto(caminho);
+    try {
+      const resultado = await excluirFotoGaleriaAdmin({ data: { caminho } });
+      setFotosGaleria(resultado.fotos);
+    } finally {
+      setExcluindoFoto(null);
     }
   }
 
@@ -486,6 +632,161 @@ function Admin() {
             {erroConfig && <p className="mt-2 text-sm text-destructive">{erroConfig}</p>}
           </div>
         </form>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-display text-xl text-foreground">Conteúdo do site</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Edite o texto "Sobre o espaço", os destaques e as regras do local — aparecem no site na
+          hora, sem precisar de código.
+        </p>
+
+        <form onSubmit={salvarConteudo} className="mt-5 space-y-6">
+          <label className="block text-xs text-muted-foreground">
+            Texto "Sobre o espaço" (depois de "com capacidade para X pessoas.")
+            <textarea
+              value={sobreTexto}
+              onChange={(e) => {
+                setSobreTexto(e.target.value);
+                setConteudoSalvo(false);
+              }}
+              rows={4}
+              className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+            />
+          </label>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-foreground">Destaques (cards)</p>
+              <button
+                type="button"
+                onClick={adicionarDiferencial}
+                className="flex items-center gap-1 text-sm text-leaf hover:underline"
+              >
+                <Plus className="h-4 w-4" /> Adicionar
+              </button>
+            </div>
+            <div className="mt-3 space-y-3">
+              {diferenciais.map((d, i) => (
+                <div key={i} className="flex gap-2 rounded-xl bg-secondary/40 p-3">
+                  <div className="flex-1 space-y-2">
+                    <input
+                      value={d.titulo}
+                      onChange={(e) => atualizarDiferencial(i, "titulo", e.target.value)}
+                      placeholder="Título"
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                    />
+                    <textarea
+                      value={d.texto}
+                      onChange={(e) => atualizarDiferencial(i, "texto", e.target.value)}
+                      placeholder="Descrição"
+                      rows={2}
+                      className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removerDiferencial(i)}
+                    aria-label="Remover destaque"
+                    className="self-start rounded-full p-2 text-destructive transition hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between">
+              <p className="text-sm font-medium text-foreground">Regras do espaço</p>
+              <button
+                type="button"
+                onClick={adicionarRegra}
+                className="flex items-center gap-1 text-sm text-leaf hover:underline"
+              >
+                <Plus className="h-4 w-4" /> Adicionar
+              </button>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Enquanto a lista estiver vazia, essa seção não aparece no site.
+            </p>
+            <div className="mt-3 space-y-2">
+              {regras.map((r, i) => (
+                <div key={i} className="flex gap-2">
+                  <input
+                    value={r}
+                    onChange={(e) => atualizarRegra(i, e.target.value)}
+                    placeholder="Ex: Não é permitido som após as 22h"
+                    className="flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removerRegra(i)}
+                    aria-label="Remover regra"
+                    className="rounded-full p-2 text-destructive transition hover:bg-destructive/10"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              disabled={salvandoConteudo}
+              className="rounded-full bg-primary px-5 py-2 text-sm font-medium text-primary-foreground transition hover:opacity-90 disabled:opacity-60"
+            >
+              {salvandoConteudo ? "Salvando..." : "Salvar conteúdo"}
+            </button>
+            {conteudoSalvo && <span className="ml-3 text-sm text-leaf">Salvo com sucesso.</span>}
+          </div>
+        </form>
+      </section>
+
+      <section className="mt-6 rounded-2xl border border-border bg-card p-5">
+        <h2 className="font-display text-xl text-foreground">Galeria de fotos</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Adicione ou remova as fotos que aparecem na seção "O espaço" do site.
+        </p>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+          {fotosGaleria.map((f) => (
+            <div key={f.caminho ?? f.src} className="group relative overflow-hidden rounded-xl">
+              <img src={f.src} alt={f.alt} className="h-32 w-full object-cover" />
+              <button
+                type="button"
+                onClick={() => excluirFoto(f.caminho)}
+                disabled={excluindoFoto === f.caminho}
+                aria-label="Excluir foto"
+                className="absolute right-1 top-1 flex h-7 w-7 items-center justify-center rounded-full bg-black/60 text-white opacity-0 transition group-hover:opacity-100 disabled:opacity-60"
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          ))}
+
+          <label className="flex h-32 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed border-input text-muted-foreground transition hover:border-ring hover:text-foreground">
+            {enviandoFoto ? (
+              <span className="text-xs">Enviando...</span>
+            ) : (
+              <>
+                <Upload className="h-5 w-5" />
+                <span className="text-xs">Adicionar foto</span>
+              </>
+            )}
+            <input
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={enviarFoto}
+              disabled={enviandoFoto}
+              className="hidden"
+            />
+          </label>
+        </div>
+        {erroFoto && <p className="mt-2 text-sm text-destructive">{erroFoto}</p>}
       </section>
 
       <section className="mt-6 rounded-2xl border border-border bg-card p-5">

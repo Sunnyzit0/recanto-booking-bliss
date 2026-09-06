@@ -21,9 +21,6 @@ export const CONFIG = {
   horario: "das 8h às 20h",
   pagamento: "Pix ou dinheiro",
   cancelamento: "Cancelamento gratuito até 7 dias antes da data reservada.",
-  // Regras do espaço — o cliente ainda vai definir o texto. Enquanto
-  // estiver vazio, a seção não aparece no site.
-  regras: [] as string[],
   // O login do admin agora é feito por senha única, verificada no
   // servidor (variável de ambiente ADMIN_PASSWORD) — veja src/lib/admin-actions.ts.
 };
@@ -117,17 +114,45 @@ export async function reservasEstaoAbertas(): Promise<boolean> {
   return data ?? true;
 }
 
-export type ConfigPublica = { valorDiaria: number; capacidade: string; horario: string };
+export type Diferencial = { titulo: string; texto: string };
+export type FotoGaleria = { src: string; alt: string; caminho?: string };
+
+export type ConfigPublica = {
+  valorDiaria: number;
+  capacidade: string;
+  horario: string;
+  sobreTexto: string;
+  diferenciais: Diferencial[];
+  regras: string[];
+  galeriaFotos: FotoGaleria[];
+};
+
+const DIFERENCIAIS_PADRAO: Diferencial[] = [
+  { titulo: "Piscina com cascata", texto: "Piscina ampla com chafariz decorativo e iluminação à noite." },
+  { titulo: "Churrasqueira e fogão a lenha", texto: "Fogão a lenha, forno e churrasqueira prontos para o dia inteiro de festa." },
+  { titulo: "Área gourmet", texto: "Cooktop, pia e bancada de mármore com mesa e banco rústicos." },
+  { titulo: "Espaço amplo", texto: "Bastante espaço externo para receber os convidados com conforto." },
+  { titulo: "Wi-fi liberado", texto: "Internet disponível em todo o espaço." },
+  { titulo: "Lugar tranquilo", texto: "Ambiente calmo, ideal para relaxar e aproveitar o dia com quem você ama." },
+];
 
 const CONFIG_PADRAO: ConfigPublica = {
   valorDiaria: 600,
   capacidade: "até 40 pessoas",
   horario: "das 8h às 20h",
+  sobreTexto:
+    "O aluguel inclui toda a estrutura: piscina com cascata, churrasqueira, fogão a lenha, área " +
+    "gourmet completa e wi-fi. Ideal para todo tipo de evento e celebração, dos encontros em " +
+    "família às festas maiores.",
+  diferenciais: DIFERENCIAIS_PADRAO,
+  regras: [],
+  galeriaFotos: [],
 };
 
 /**
- * Lê preço/capacidade/horário configurados pelo admin no painel. Se
- * ainda não foram configurados, usa os valores padrão acima.
+ * Lê preço/capacidade/horário e o conteúdo (sobre, diferenciais,
+ * regras, fotos) configurados pelo admin no painel. Se ainda não
+ * foram configurados, usa os valores padrão acima.
  */
 export async function lerConfigPublica(): Promise<ConfigPublica> {
   const { data, error } = await supabase.rpc("obter_config_publica");
@@ -142,6 +167,10 @@ export async function lerConfigPublica(): Promise<ConfigPublica> {
     valorDiaria: Number(mapa.valor_diaria) || CONFIG_PADRAO.valorDiaria,
     capacidade: mapa.capacidade || CONFIG_PADRAO.capacidade,
     horario: mapa.horario || CONFIG_PADRAO.horario,
+    sobreTexto: mapa.sobre_texto || CONFIG_PADRAO.sobreTexto,
+    diferenciais: mapa.diferenciais ? JSON.parse(mapa.diferenciais) : CONFIG_PADRAO.diferenciais,
+    regras: mapa.regras ? JSON.parse(mapa.regras) : CONFIG_PADRAO.regras,
+    galeriaFotos: mapa.galeria_fotos ? JSON.parse(mapa.galeria_fotos) : CONFIG_PADRAO.galeriaFotos,
   };
 }
 

@@ -562,3 +562,135 @@ export const salvarConfigSiteAdmin = createServerFn({ method: "POST" })
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// --- Conteúdo do site (sobre, diferenciais, regras) — editável sem senha extra ---
+
+const DIFERENCIAIS_PADRAO = [
+  { titulo: "Piscina com cascata", texto: "Piscina ampla com chafariz decorativo e iluminação à noite." },
+  { titulo: "Churrasqueira e fogão a lenha", texto: "Fogão a lenha, forno e churrasqueira prontos para o dia inteiro de festa." },
+  { titulo: "Área gourmet", texto: "Cooktop, pia e bancada de mármore com mesa e banco rústicos." },
+  { titulo: "Espaço amplo", texto: "Bastante espaço externo para receber os convidados com conforto." },
+  { titulo: "Wi-fi liberado", texto: "Internet disponível em todo o espaço." },
+  { titulo: "Lugar tranquilo", texto: "Ambiente calmo, ideal para relaxar e aproveitar o dia com quem você ama." },
+];
+
+const SOBRE_TEXTO_PADRAO =
+  "O aluguel inclui toda a estrutura: piscina com cascata, churrasqueira, fogão a lenha, área " +
+  "gourmet completa e wi-fi. Ideal para todo tipo de evento e celebração, dos encontros em " +
+  "família às festas maiores.";
+
+const ConteudoSiteSchema = z.object({
+  sobreTexto: z.string().min(1).max(2000),
+  diferenciais: z.array(z.object({ titulo: z.string().min(1).max(80), texto: z.string().min(1).max(300) })).max(12),
+  regras: z.array(z.string().min(1).max(300)).max(30),
+});
+
+export const obterConteudoSiteAdmin = createServerFn({ method: "GET" }).handler(async () => {
+  exigirSessaoValida();
+  const { data, error } = await supabaseAdmin()
+    .from("configuracoes")
+    .select("chave, valor")
+    .in("chave", ["sobre_texto", "diferenciais", "regras"]);
+  if (error) throw new Error(error.message);
+
+  const mapa = Object.fromEntries((data ?? []).map((c) => [c.chave, c.valor]));
+  return {
+    sobreTexto: mapa.sobre_texto || SOBRE_TEXTO_PADRAO,
+    diferenciais: mapa.diferenciais ? JSON.parse(mapa.diferenciais) : DIFERENCIAIS_PADRAO,
+    regras: mapa.regras ? JSON.parse(mapa.regras) : [],
+  };
+});
+
+export const salvarConteudoSiteAdmin = createServerFn({ method: "POST" })
+  .validator(ConteudoSiteSchema)
+  .handler(async ({ data }) => {
+    exigirSessaoValida();
+    const { error } = await supabaseAdmin().from("configuracoes").upsert([
+      { chave: "sobre_texto", valor: data.sobreTexto },
+      { chave: "diferenciais", valor: JSON.stringify(data.diferenciais) },
+      { chave: "regras", valor: JSON.stringify(data.regras) },
+    ]);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+// --- Galeria de fotos (upload direto pelo painel, sem precisar de código) ---
+
+const UploadFotoSchema = z.object({
+  nomeArquivo: z.string().min(1).max(200),
+  tipoMime: z.enum(["image/jpeg", "image/png", "image/webp"]),
+  dadosBase64: z.string().min(1),
+  alt: z.string().min(1).max(200),
+});
+
+export const listarFotosGaleriaAdmin = createServerFn({ method: "GET" }).handler(async () => {
+  exigirSessaoValida();
+  const { data } = await supabaseAdmin()
+    .from("configuracoes")
+    .select("valor")
+    .eq("chave", "galeria_fotos")
+    .maybeSingle();
+  return { fotos: data?.valor ? JSON.parse(data.valor) : [] };
+});
+
+export const enviarFotoGaleriaAdmin = createServerFn({ method: "POST" })
+  .validator(UploadFotoSchema)
+  .handler(async ({ data }) => {
+    exigirSessaoValida();
+    const client = supabaseAdmin();
+
+    const bytes = Buffer.from(data.dadosBase64, "base64");
+    if (bytes.length > 5 * 1024 * 1024) {
+      return { ok: false, erro: "Imagem muito grande (máximo 5MB)." };
+    }
+
+    const extensao = data.tipoMime === "image/png" ? "png" : data.tipoMime === "image/webp" ? "webp" : "jpg";
+    const caminho = `${Date.now()}-${crypto.randomUUID().slice(0, 8)}.${extensao}`;
+
+    const { error: erroUpload } = await client.storage
+      .from("galeria")
+      .upload(caminho, bytes, { contentType: data.tipoMime });
+    if (erroUpload) throw new Error(erroUpload.message);
+
+    const { data: urlPublica } = client.storage.from("galeria").getPublicUrl(caminho);
+
+    const { data: atual } = await client
+      .from("configuracoes")
+      .select("valor")
+      .eq("chave", "galeria_fotos")
+      .maybeSingle();
+    const fotos = atual?.valor ? JSON.parse(atual.valor) : [];
+    fotos.push({ src: urlPublica.publicUrl, alt: data.alt, caminho });
+
+    const { error: erroSalvar } = await client
+      .from("configuracoes")
+      .upsert({ chave: "galeria_fotos", valor: JSON.stringify(fotos) });
+    if (erroSalvar) throw new Error(erroSalvar.message);
+
+    return { ok: true, fotos };
+  });
+
+export const excluirFotoGaleriaAdmin = createServerFn({ method: "POST" })
+  .validator(z.object({ caminho: z.string().min(1) }))
+  .handler(async ({ data }) => {
+    exigirSessaoValida();
+    const client = supabaseAdmin();
+
+    await client.storage.from("galeria").remove([data.caminho]);
+
+    const { data: atual } = await client
+      .from("configuracoes")
+      .select("valor")
+      .eq("chave", "galeria_fotos")
+      .maybeSingle();
+    const fotos = (atual?.valor ? JSON.parse(atual.valor) : []).filter(
+      (f: { caminho: string }) => f.caminho !== data.caminho,
+    );
+
+    const { error } = await client
+      .from("configuracoes")
+      .upsert({ chave: "galeria_fotos", valor: JSON.stringify(fotos) });
+    if (error) throw new Error(error.message);
+
+    return { ok: true, fotos };
+  });

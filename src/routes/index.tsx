@@ -7,6 +7,7 @@ import { CaptchaTurnstile, type CaptchaTurnstileHandle } from "@/components/Capt
 import { criarSolicitacaoServidor } from "@/lib/email-actions";
 import {
   CONFIG,
+  type ConfigPublica,
   lerConfigPublica,
   escutarBloqueios,
   formatarData,
@@ -197,7 +198,18 @@ function Home() {
   const enviandoRef = useRef(false);
   const [erroConexao, setErroConexao] = useState(false);
   const [reservasAbertas, setReservasAbertas] = useState(true);
-  const [config, setConfig] = useState({ valorDiaria: 600, capacidade: "até 40 pessoas", horario: "das 8h às 20h" });
+  const [config, setConfig] = useState<ConfigPublica>({
+    valorDiaria: 600,
+    capacidade: "até 40 pessoas",
+    horario: "das 8h às 20h",
+    sobreTexto:
+      "O aluguel inclui toda a estrutura: piscina com cascata, churrasqueira, fogão a lenha, " +
+      "área gourmet completa e wi-fi. Ideal para todo tipo de evento e celebração, dos encontros " +
+      "em família às festas maiores.",
+    diferenciais: DIFERENCIAIS,
+    regras: [],
+    galeriaFotos: FOTOS,
+  });
   const [imagemAmpliada, setImagemAmpliada] = useState<{ src: string; alt: string } | null>(null);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const captchaRef = useRef<CaptchaTurnstileHandle>(null);
@@ -430,14 +442,11 @@ function Home() {
       <section className="mx-auto max-w-5xl px-4 py-14">
         <h2 className="font-display text-3xl font-semibold text-foreground">Sobre o espaço</h2>
         <p className="mt-4 max-w-3xl text-muted-foreground">
-          Espaço para alugar por diária, com capacidade para {config.capacidade}. O aluguel inclui
-          toda a estrutura: piscina com cascata, churrasqueira, fogão a lenha, área gourmet
-          completa e wi-fi. Ideal para todo tipo de evento e celebração, dos encontros em família
-          às festas maiores.
+          Espaço para alugar por diária, com capacidade para {config.capacidade}. {config.sobreTexto}
         </p>
 
         <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {DIFERENCIAIS.map((d) => (
+          {config.diferenciais.map((d) => (
             <div
               key={d.titulo}
               className="shadow-soft rounded-2xl border border-border bg-card p-5 transition duration-300 hover:-translate-y-1 hover:shadow-lg"
@@ -465,7 +474,7 @@ function Home() {
       <section className="mx-auto max-w-5xl px-4 pb-14">
         <h2 className="font-display text-3xl font-semibold text-foreground">O espaço</h2>
         <div className="mt-6 grid gap-4 sm:grid-cols-2">
-          {FOTOS.map((f) => (
+          {config.galeriaFotos.map((f) => (
             <button
               key={f.src}
               type="button"
@@ -732,11 +741,11 @@ function Home() {
         </div>
       </footer>
 
-      {CONFIG.regras.length > 0 && (
+      {config.regras.length > 0 && (
         <section className="mx-auto max-w-5xl px-4 py-14">
           <h2 className="font-display text-2xl font-semibold text-foreground">Regras do espaço</h2>
           <ul className="mt-4 list-disc space-y-2 pl-5 text-muted-foreground">
-            {CONFIG.regras.map((regra, i) => (
+            {config.regras.map((regra, i) => (
               <li key={i}>{regra}</li>
             ))}
           </ul>
