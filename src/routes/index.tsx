@@ -24,6 +24,8 @@ import {
 const URL_BASE = "https://www.recantodapiscina.com.br";
 
 import logo from "@/assets/logo.png";
+// Versão 128px só pro topo (exibida a 44px); a de 800px fica pro lightbox.
+import logoPequena from "@/assets/logo-128.png";
 import videoApresentacao from "@/assets/recanto-apresentacao.mp4";
 import capaVideo from "@/assets/capa-video.jpg";
 import fotoPiscina from "@/assets/piscina-dia.jpg";
@@ -365,8 +367,10 @@ function Home() {
               className="rounded-full ring-2 ring-border transition hover:opacity-80"
             >
               <img
-                src={logo}
+                src={logoPequena}
                 alt="Logo Recanto da Piscina"
+                width={44}
+                height={44}
                 className="h-11 w-11 rounded-full object-cover"
               />
             </button>
@@ -566,6 +570,8 @@ function Home() {
                   value={nome}
                   onChange={(e) => setNome(e.target.value)}
                   required
+                  autoComplete="name"
+                  maxLength={80}
                   className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground outline-none focus:border-ring"
                 />
               </label>
@@ -576,7 +582,8 @@ function Home() {
                   value={telefone}
                   onChange={(e) => setTelefone(formatarTelefone(e.target.value))}
                   required
-                  inputMode="numeric"
+                  autoComplete="tel"
+                  inputMode="tel"
                   placeholder="(61) 90000-0000"
                   maxLength={15}
                   className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground outline-none focus:border-ring"
@@ -589,6 +596,8 @@ function Home() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
+                  autoComplete="email"
+                  maxLength={120}
                   placeholder="seuemail@exemplo.com"
                   className="mt-1 w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground outline-none focus:border-ring"
                 />

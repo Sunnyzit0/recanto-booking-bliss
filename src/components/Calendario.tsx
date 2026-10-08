@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Lock } from "lucide-react";
-import { toISO } from "@/lib/reservas";
+import { primeiroDiaReservavel, toISO } from "@/lib/reservas";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -43,6 +43,7 @@ export function Calendario({
   const primeiroDia = new Date(ano, mes, 1).getDay();
   const totalDias = new Date(ano, mes + 1, 0).getDate();
   const hojeISO = toISO(hoje);
+  const primeiroReservavel = primeiroDiaReservavel();
 
   function mudarMes(delta: number) {
     const d = new Date(ano, mes + delta, 1);
@@ -71,6 +72,13 @@ export function Calendario({
     // primeira vista — trocado por um cinza-azulado (bem mais distante
     // na roda de cores) e reforçado com o ícone de cadeado no dia.
     indisponivel: "bg-slate-400 text-slate-950 line-through dark:bg-slate-600 dark:text-slate-50",
+  };
+
+  const ROTULOS: Record<Estado, string> = {
+    disponivel: "Disponível",
+    pendente: "Em análise",
+    reservada: "Reservada",
+    indisponivel: "Indisponível",
   };
 
   const TITULOS: Record<Estado, string | undefined> = {
@@ -118,15 +126,19 @@ export function Calendario({
           const dia = i + 1;
           const iso = toISO(new Date(ano, mes, dia));
           const passado = iso < hojeISO;
-          const antesDeAmanha = iso <= hojeISO;
+          const antesDoPrimeiroReservavel = iso < primeiroReservavel;
           const estado = estadoDoDia(iso);
           const foraDaJanela =
             !modoAdmin &&
             ((dataMinima && iso < dataMinima) || (dataMaxima && iso > dataMaxima));
           const desabilitada = modoAdmin
             ? passado
-            : antesDeAmanha || estado !== "disponivel" || foraDaJanela;
+            : antesDoPrimeiroReservavel || estado !== "disponivel" || foraDaJanela;
           const ativa = selecionadas?.has(iso) ?? false;
+          // Dia passado/bloqueado (mas sem reserva) também é anunciado
+          // como "Indisponível" pro leitor de tela.
+          const rotulo =
+            estado === "disponivel" && desabilitada ? ROTULOS.indisponivel : ROTULOS[estado];
 
           return (
             <button
@@ -135,6 +147,8 @@ export function Calendario({
               disabled={desabilitada || !onSelecionar}
               onClick={() => onSelecionar?.(iso)}
               title={TITULOS[estado]}
+              aria-label={`${dia} de ${(MESES[mes] ?? "").toLowerCase()} de ${ano} — ${rotulo}`}
+              aria-pressed={ativa}
               className={[
                 "aspect-square rounded-lg text-sm transition",
                 ativa

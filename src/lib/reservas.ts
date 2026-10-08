@@ -8,7 +8,7 @@ export const CONFIG = {
   subtitulo: "Espaço de Eventos",
   telefone: "(61) 99883-4734",
   whatsapp: "5561998834734",
-  cidade: "Padre Bernardo - GO, Setor Leste",
+  cidade: "Padre Bernardo - GO",
   endereco: "Rua 41, Lote 03, Setor Leste",
   coordenadas: { lat: -15.175238575576874, lng: -48.26782284958184 },
   linkGoogleMaps:
@@ -174,11 +174,20 @@ export async function lerConfigPublica(): Promise<ConfigPublica> {
   };
 }
 
+/**
+ * Primeiro dia que o cliente pode reservar (AAAA-MM-DD): hoje e dias
+ * passados ficam bloqueados. Usado pelo calendário e pelo texto
+ * "Reservas abertas de ..." — mude só aqui pra ajustar a antecedência.
+ */
+export function primeiroDiaReservavel(): string {
+  const hoje = new Date();
+  return toISO(new Date(hoje.getFullYear(), hoje.getMonth(), hoje.getDate() + 1));
+}
+
 export function janelaDeReserva(): { min: string; max: string } {
   const hoje = new Date();
-  const inicio = new Date(hoje.getFullYear(), hoje.getMonth(), 1);
   const fim = new Date(hoje.getFullYear(), hoje.getMonth() + 7, 0);
-  return { min: toISO(inicio), max: toISO(fim) };
+  return { min: primeiroDiaReservavel(), max: toISO(fim) };
 }
 
 /** Datas bloqueadas manualmente pelo dono (não contém dados sensíveis) */
